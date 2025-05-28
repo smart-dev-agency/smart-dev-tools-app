@@ -1,0 +1,105 @@
+@use "./grid.scss" as *;
+
+:root {
+  --bg-primary: #f0f4f8;
+  --text-primary: #1a365d;
+
+  --panel-bg: #ffffff;
+  --panel-border: transparent;
+  --panel-header-bg: #e6f0ff;
+  --panel-content-bg: #ffffff;
+
+  --code-bg: #f5f7fa;
+  --code-color: #2c5282;
+
+  --error-color: #e53e3e;
+  --error-bg: rgba(229, 62, 62, 0.1);
+
+  --placeholder-color: #718096;
+  --input-border: rgba(66, 153, 225, 0.3);
+  --input-bg: #ffffff;
+  --input-color: #2d3748;
+  --input-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --input-focus-shadow: 0 0 0 3px rgba(66, 153, 225, 0.15);
+
+  --button-bg: #24c8db;
+  --button-color: #ffffff;
+  --button-active-bg: #1fa7b8;
+  --button-border: #24c8db40;
+  --button-border-hover: #1c9faf;
+
+  --sidebar-bg: #f8fafc;
+  --sidebar-color: #2d3748;
+  --sidebar-border: #e2e8f0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-primary: #1a1a1a;
+    --text-primary: #f7fafc;
+
+    --panel-bg: #232323;
+    --panel-border: transparent;
+    --panel-header-bg: #2d2d2d;
+    --panel-content-bg: #232323;
+
+    --code-bg: #2a2a2a;
+    --code-color: #f7fafc;
+
+    --error-color: #ff6b6b;
+    --error-bg: rgba(255, 107, 107, 0.1);
+
+    --placeholder-color: #718096;
+    --input-border: rgba(255, 255, 255, 0.1);
+  }
+}
+
+* {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  background: transparent;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--button-bg);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--button-active-bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}

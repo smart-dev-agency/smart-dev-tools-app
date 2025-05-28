@@ -1,0 +1,37 @@
+# Native compilation configuration for Tauri builds
+# Each platform builds natively on its respective runner for maximum compatibility
+
+# Windows builds - native compilation on Windows runners
+[target.x86_64-pc-windows-msvc]
+rustflags = [
+  "-C", "target-feature=+crt-static",
+  "-C", "opt-level=3"
+]
+
+# macOS Intel builds - native compilation on macOS Intel runners
+[target.x86_64-apple-darwin]
+rustflags = [
+  "-C", "link-arg=-mmacosx-version-min=10.13",
+  "-C", "opt-level=3"
+]
+
+# macOS Apple Silicon builds - native compilation on macOS ARM runners
+[target.aarch64-apple-darwin]
+rustflags = [
+  "-C", "link-arg=-mmacosx-version-min=11.0",
+  "-C", "opt-level=3"
+]
+
+# Linux builds - native compilation on Linux runners
+[target.x86_64-unknown-linux-gnu]
+rustflags = [
+  "-C", "opt-level=3"
+]
+
+[build]
+# Use native target by default (no cross-compilation)
+jobs = 4
+
+[env]
+# Environment variables for native builds
+PKG_CONFIG_ALLOW_CROSS = "0"

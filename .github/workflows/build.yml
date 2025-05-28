@@ -1,0 +1,293 @@
+name: 'Build and Test Smart Dev Tools'
+
+# This workflow builds native binaries for each platform using their respective runners:
+# - macOS Intel: Built on macos-13 (Intel hardware) 
+# - macOS Apple Silicon: Built on macos-14 (ARM64 hardware)
+# - Linux x86_64: Built on ubuntu-22.04 (x86_64 hardware)
+# - Windows x86_64: Built on windows-latest (x86_64 hardware)
+#
+# No cross-compilation is used - each binary is compiled natively on its target platform
+# to ensure maximum compatibility and performance.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS Intel (x86_64) - compiled natively on Intel runner
+          - platform: 'macos-13'
+            target: x86_64-apple-darwin
+            arch: 'Intel'
+            os: 'macOS'
+            runner_arch: 'x64'
+          # macOS Apple Silicon (ARM64) - compiled natively on ARM runner
+          - platform: 'macos-14'
+            target: aarch64-apple-darwin
+            arch: 'Apple Silicon'
+            os: 'macOS'
+            runner_arch: 'arm64'
+          # Linux x86_64 - compiled natively
+          - platform: 'ubuntu-22.04'
+            target: x86_64-unknown-linux-gnu
+            arch: 'x86_64'
+            os: 'Linux'
+          # Windows x86_64 - compiled natively
+          - platform: 'windows-latest'
+            target: x86_64-pc-windows-msvc
+            arch: 'x86_64'
+            os: 'Windows'
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Verify native compilation setup
+        shell: bash
+        run: |
+          echo "🔧 Build Environment Details:"
+          echo "Runner OS: ${{ runner.os }}"
+          echo "Platform: ${{ matrix.platform }}"
+          echo "Target: ${{ matrix.target }}"
+          echo "Expected Arch: ${{ matrix.arch }}"
+          
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            echo "System arch: $(uname -m)"
+            echo "Xcode path: $(xcode-select -p)"
+          elif [[ "${{ runner.os }}" == "Linux" ]]; then
+            echo "System arch: $(uname -m)"
+          elif [[ "${{ runner.os }}" == "Windows" ]]; then
+            echo "System arch: $env:PROCESSOR_ARCHITECTURE"
+          fi
+          
+          echo "Rust default host: $(rustc -vV | grep host | sed 's/host: //')"
+          echo "✅ Using native compilation - no cross-compilation targets needed"
+
+      - name: Set macOS deployment target
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          if [[ "${{ matrix.platform }}" == "macos-14" ]]; then
+            echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> $GITHUB_ENV
+            echo "📱 Apple Silicon build - deployment target: 11.0"
+          else
+            echo "MACOSX_DEPLOYMENT_TARGET=10.13" >> $GITHUB_ENV
+            echo "💻 Intel Mac build - deployment target: 10.13"
+          fi
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+
+      - name: Install frontend dependencies
+        run: yarn install
+
+      - name: Build the application
+        shell: bash
+        run: |
+          echo "🚀 Building with yarn tauri build (native compilation)"
+          echo "Platform: ${{ matrix.platform }} → ${{ matrix.arch }}"
+          echo "Target: ${{ matrix.target }}"
+          echo "System arch: $(uname -m || echo 'unknown')"
+          
+          # Use native compilation - no cross-compilation needed
+          yarn tauri build
+
+      - name: Post-build verification
+        shell: bash
+        run: |
+          echo "🔍 Post-build verification"
+          echo "Checking build artifacts..."
+          
+          # Check if bundle directory exists
+          if [[ -d "src-tauri/target/release/bundle" ]]; then
+            cd src-tauri/target/release/bundle
+            
+            # List bundle types found
+            echo "📋 Bundle types found:"
+            ls -la . || echo "No bundle directories found"
+            
+            # Check for specific artifacts by platform
+            if [[ "${{ runner.os }}" == "macOS" ]]; then
+              echo "📦 macOS artifacts:"
+              dmg_files=$(find . -name "*.dmg" -type f 2>/dev/null | head -5 || true)
+              if [[ -n "$dmg_files" ]]; then
+                echo "$dmg_files"
+              else
+                echo "No DMG files found"
+              fi
+            elif [[ "${{ runner.os }}" == "Linux" ]]; then
+              echo "📦 Linux artifacts:"
+              deb_files=$(find . -name "*.deb" -type f 2>/dev/null | head -3 || true)
+              if [[ -n "$deb_files" ]]; then
+                echo "DEB files:"
+                echo "$deb_files"
+              else
+                echo "No DEB files found"
+              fi
+              appimage_files=$(find . -name "*.AppImage" -type f 2>/dev/null | head -3 || true)
+              if [[ -n "$appimage_files" ]]; then
+                echo "AppImage files:"
+                echo "$appimage_files"
+              else
+                echo "No AppImage files found"
+              fi
+              rpm_files=$(find . -name "*.rpm" -type f 2>/dev/null | head -3 || true)
+              if [[ -n "$rpm_files" ]]; then
+                echo "RPM files:"
+                echo "$rpm_files"
+              else
+                echo "No RPM files found"
+              fi
+            elif [[ "${{ runner.os }}" == "Windows" ]]; then
+              echo "📦 Windows artifacts:"
+              exe_files=$(find . -name "*.exe" -type f 2>/dev/null | head -3 || true)
+              if [[ -n "$exe_files" ]]; then
+                echo "EXE files:"
+                echo "$exe_files"
+              else
+                echo "No EXE files found"
+              fi
+              msi_files=$(find . -name "*.msi" -type f 2>/dev/null | head -3 || true)
+              if [[ -n "$msi_files" ]]; then
+                echo "MSI files:"
+                echo "$msi_files"
+              else
+                echo "No MSI files found"
+              fi
+            fi
+            
+            echo "✅ Build verification completed successfully"
+          else
+            echo "❌ Bundle directory not found: src-tauri/target/release/bundle"
+            echo "📁 Available directories in src-tauri/target/release/:"
+            ls -la src-tauri/target/release/ 2>/dev/null || echo "Release directory not found"
+            
+            # Check if there are any artifacts in other locations
+            echo "🔍 Searching for artifacts in target directory:"
+            found_artifacts=$(find src-tauri/target -name "*.dmg" -o -name "*.exe" -o -name "*.msi" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.rpm" 2>/dev/null | head -5 || true)
+            if [[ -n "$found_artifacts" ]]; then
+              echo "$found_artifacts"
+            else
+              echo "No artifacts found"
+            fi
+            exit 1
+          fi
+
+      - name: Upload build artifacts (for testing)
+        uses: actions/upload-artifact@v4
+        if: github.event_name == 'pull_request'
+        with:
+          name: smart-dev-tools-${{ matrix.target }}-pr
+          path: |
+            src-tauri/target/release/bundle/**/*.dmg
+            src-tauri/target/release/bundle/**/*.exe
+            src-tauri/target/release/bundle/**/*.msi
+            src-tauri/target/release/bundle/**/*.deb
+            src-tauri/target/release/bundle/**/*.rpm
+            src-tauri/target/release/bundle/**/*.AppImage
+          retention-days: 7
+
+      - name: Upload main branch artifacts
+        uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        with:
+          name: build-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            src-tauri/target/release/bundle/**/*.dmg
+            src-tauri/target/release/bundle/**/*.exe
+            src-tauri/target/release/bundle/**/*.msi
+            src-tauri/target/release/bundle/**/*.deb
+            src-tauri/target/release/bundle/**/*.rpm
+            src-tauri/target/release/bundle/**/*.AppImage
+          retention-days: 30
+
+  # Create tag when push to main is successful
+  create-tag:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      actions: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+        
+      - name: Get version and create tag
+        id: tag
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v$VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          
+          # Check if tag already exists
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists, skipping tag creation"
+            echo "tag_created=false" >> $GITHUB_OUTPUT
+          else
+            echo "Creating tag $TAG"
+            git config --global user.name 'github-actions[bot]'
+            git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+            git tag -a "$TAG" -m "Release $TAG"
+            git push origin "$TAG"
+            echo "tag_created=true" >> $GITHUB_OUTPUT
+          fi
+          
+      - name: Trigger release workflow
+        if: steps.tag.outputs.tag_created == 'true'
+        run: |
+          echo "🚀 Triggering release workflow for tag: ${{ steps.tag.outputs.tag }}"
+          curl -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/${{ github.repository }}/dispatches \
+            -d '{
+              "event_type": "release_requested",
+              "client_payload": {
+                "tag": "${{ steps.tag.outputs.tag }}",
+                "version": "${{ steps.tag.outputs.version }}",
+                "sha": "${{ github.sha }}"
+              }
+            }'
+          
+      - name: Tag created notification
+        if: steps.tag.outputs.tag_created == 'true'
+        run: |
+          echo "✅ Tag ${{ steps.tag.outputs.tag }} created successfully!"
+          echo "🚀 Release workflow has been triggered."

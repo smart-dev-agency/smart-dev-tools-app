@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Modern gradient background with smooth corner radius -->
+  <defs>
+    <linearGradient id="grad" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1E88E5"/>
+      <stop offset="1" stop-color="#00ACC1"/>
+    </linearGradient>
+    <!-- Subtle inner shadow for depth -->
+    <filter id="innerShadow" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB">
+      <feOffset dx="0" dy="6"/>
+      <feGaussianBlur stdDeviation="8" result="offset-blur"/>
+      <feComposite operator="out" in="SourceGraphic" in2="offset-blur" result="inverse"/>
+      <feFlood flood-color="rgba(0,0,0,0.25)" result="color"/>
+      <feComposite operator="in" in="color" in2="inverse" result="shadow"/>
+      <feComposite operator="over" in="shadow" in2="SourceGraphic"/>
+    </filter>
+  </defs>
+
+  <rect width="256" height="256" rx="48" fill="url(#grad)" filter="url(#innerShadow)"/>
+
+  <!-- Stylised letter S -->
+  <path d="M76 72C76 57.4 88.4 45 103 45H153C168.6 45 181 57.4 181 73C181 88.6 168.6 101 153 101H103C87.4 101 75 113.4 75 129C75 144.6 87.4 157 103 157H153C168.6 157 181 169.4 181 185C181 200.6 168.6 213 153 213H103C88.4 213 76 200.6 76 186" stroke="white" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Minimal gear outline for devtools context -->
+  <g transform="translate(128 128)">
+    <!-- Outer gear -->
+    <circle r="70" stroke="rgba(255,255,255,0.35)" stroke-width="10" stroke-dasharray="8 26" stroke-linecap="round"/>
+  </g>
+</svg>

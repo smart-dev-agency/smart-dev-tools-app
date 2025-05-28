@@ -1,0 +1,401 @@
+# Official Release Workflow
+# 
+# This workflow builds native binaries for each platform using their respective runners:
+# - macOS Intel: Built on macos-13 (Intel hardware) 
+# - macOS Apple Silicon: Built on macos-14 (ARM64 hardware)
+# - Linux x86_64: Built on ubuntu-22.04 (x86_64 hardware)
+# - Windows x86_64: Built on windows-latest (x86_64 hardware)
+#
+# No cross-compilation is used - each binary is compiled natively on its target platform
+# to ensure maximum compatibility and performance.
+
+name: 'Official Release'
+
+on:
+  push:
+    tags:
+      - 'v*'
+  repository_dispatch:
+    types: [release_requested]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release'
+        required: true
+        type: string
+      version:
+        description: 'Version to release'
+        required: true
+        type: string
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS Intel (x86_64) - compiled natively on Intel runner
+          - platform: 'macos-13'
+            args: ''
+            target: x86_64-apple-darwin
+            arch: 'Intel'
+            runner_arch: 'x64'
+          # macOS Apple Silicon (ARM64) - compiled natively on ARM runner
+          - platform: 'macos-14'
+            args: ''
+            target: aarch64-apple-darwin
+            arch: 'Apple Silicon'
+            runner_arch: 'arm64'
+          # Linux x86_64 - compiled natively
+          - platform: 'ubuntu-22.04'
+            args: ''
+            target: x86_64-unknown-linux-gnu
+            arch: 'x86_64'
+            runner_arch: 'x64'
+          # Windows x86_64 - compiled natively
+          - platform: 'windows-latest'
+            args: ''
+            target: x86_64-pc-windows-msvc
+            arch: 'x86_64'
+            runner_arch: 'x64'
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.tag || (github.event_name == 'workflow_dispatch' && github.event.inputs.tag) || github.ref }}
+
+      - name: Install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Verify native compilation setup
+        shell: bash
+        run: |
+          echo "🔧 Build Environment Details:"
+          echo "Runner OS: ${{ runner.os }}"
+          echo "Runner Arch: ${{ runner.arch }}"
+          echo "Platform: ${{ matrix.platform }}"
+          echo "Target: ${{ matrix.target }}"
+          echo "Expected Arch: ${{ matrix.arch }}"
+          
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            echo "System arch: $(uname -m)"
+            echo "Xcode path: $(xcode-select -p)"
+            echo "Xcode SDK path: $(xcrun --show-sdk-path)"
+          elif [[ "${{ runner.os }}" == "Linux" ]]; then
+            echo "System arch: $(uname -m)"
+            echo "GCC version: $(gcc --version | head -n1)"
+          elif [[ "${{ runner.os }}" == "Windows" ]]; then
+            echo "System arch: $env:PROCESSOR_ARCHITECTURE"
+          fi
+          
+          echo "Rust default host: $(rustc -vV | grep host | sed 's/host: //')"
+          echo "✅ Using native compilation - no cross-compilation targets needed"
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Sync node version and setup cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'yarn'
+
+      - name: Install frontend dependencies
+        run: yarn install
+
+      - name: Set macOS deployment target
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          if [[ "${{ matrix.platform }}" == "macos-14" ]]; then
+            echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> $GITHUB_ENV
+            echo "📱 Apple Silicon build - deployment target: 11.0"
+          else
+            echo "MACOSX_DEPLOYMENT_TARGET=10.13" >> $GITHUB_ENV
+            echo "💻 Intel Mac build - deployment target: 10.13"
+          fi
+
+      - name: Pre-build verification
+        shell: bash
+        run: |
+          echo "🔍 Pre-build verification:"
+          echo "About to build with yarn tauri build (native compilation)"
+          echo "No cross-compilation targets will be specified"
+          echo "Platform: ${{ matrix.platform }} → ${{ matrix.arch }}"
+          
+          # Show project info
+          echo "📦 Project info:"
+          cat package.json | grep -E '"name"|"version"'
+          
+          # Verify Tauri config
+          echo "⚙️ Tauri config:"
+          cat src-tauri/tauri.conf.json | grep -E '"productName"|"version"|"identifier"'
+
+      - name: Get version from tag or input
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            TAG="${{ github.event.inputs.tag }}"
+          elif [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            VERSION="${{ github.event.client_payload.version }}"
+            TAG="${{ github.event.client_payload.tag }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+            TAG=$GITHUB_REF_NAME
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "📦 Building release for version: $VERSION (tag: $TAG)"
+        shell: bash
+
+      # Build using direct yarn tauri build for better compatibility
+      - name: Build the app
+        shell: bash
+        run: |
+          echo "🚀 Building with yarn tauri build (native compilation)"
+          echo "Platform: ${{ matrix.platform }} → ${{ matrix.arch }}"
+          yarn tauri build
+
+      # Find and list built artifacts
+      - name: Find build artifacts
+        id: artifacts
+        shell: bash
+        run: |
+          echo "🔍 Finding build artifacts..."
+          
+          # Check if bundle directory exists
+          if [[ -d "src-tauri/target/release/bundle" ]]; then
+            cd src-tauri/target/release/bundle
+            
+            # List bundle types found
+            echo "📋 Bundle types found:"
+            ls -la . || echo "No bundle directories found"
+            
+            # Check for specific artifacts by platform
+            if [[ "${{ runner.os }}" == "macOS" ]]; then
+              echo "📦 macOS artifacts:"
+              if find . -name "*.dmg" -type f 2>/dev/null | grep -q .; then
+                echo "DMG files:"
+                find . -name "*.dmg" -type f 2>/dev/null | head -5
+              else
+                echo "No DMG files found"
+              fi
+            elif [[ "${{ runner.os }}" == "Linux" ]]; then
+              echo "📦 Linux artifacts:"
+              if find . -name "*.deb" -type f 2>/dev/null | grep -q .; then
+                echo "DEB files:"
+                find . -name "*.deb" -type f 2>/dev/null | head -3
+              else
+                echo "No DEB files found"
+              fi
+              if find . -name "*.AppImage" -type f 2>/dev/null | grep -q .; then
+                echo "AppImage files:"
+                find . -name "*.AppImage" -type f 2>/dev/null | head -3
+              else
+                echo "No AppImage files found"
+              fi
+              if find . -name "*.rpm" -type f 2>/dev/null | grep -q .; then
+                echo "RPM files:"
+                find . -name "*.rpm" -type f 2>/dev/null | head -3
+              else
+                echo "No RPM files found"
+              fi
+            elif [[ "${{ runner.os }}" == "Windows" ]]; then
+              echo "📦 Windows artifacts:"
+              if find . -name "*.exe" -type f 2>/dev/null | grep -q .; then
+                echo "EXE files:"
+                find . -name "*.exe" -type f 2>/dev/null | head -3
+              else
+                echo "No EXE files found"
+              fi
+              if find . -name "*.msi" -type f 2>/dev/null | grep -q .; then
+                echo "MSI files:"
+                find . -name "*.msi" -type f 2>/dev/null | head -3
+              else
+                echo "No MSI files found"
+              fi
+            fi
+            
+            echo "✅ Build verification completed successfully"
+          else
+            echo "❌ Bundle directory not found: src-tauri/target/release/bundle"
+            echo "📁 Available directories in src-tauri/target/release/:"
+            ls -la src-tauri/target/release/ 2>/dev/null || echo "Release directory not found"
+            
+            # Check if there are any artifacts in other locations
+            echo "🔍 Searching for artifacts in target directory:"
+            find src-tauri/target -name "*.dmg" -o -name "*.exe" -o -name "*.msi" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.rpm" 2>/dev/null | head -5 || echo "No artifacts found"
+            exit 1
+          fi
+
+      # Upload build artifacts
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            src-tauri/target/release/bundle/**/*.dmg
+            src-tauri/target/release/bundle/**/*.deb
+            src-tauri/target/release/bundle/**/*.rpm
+            src-tauri/target/release/bundle/**/*.AppImage
+            src-tauri/target/release/bundle/**/*.exe
+            src-tauri/target/release/bundle/**/*.msi
+          retention-days: 1
+
+  # Create GitHub release after all builds complete
+  create-release:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version from tag or input
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            TAG="${{ github.event.inputs.tag }}"
+          elif [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            VERSION="${{ github.event.client_payload.version }}"
+            TAG="${{ github.event.client_payload.tag }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+            TAG=$GITHUB_REF_NAME
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "📦 Creating release for version: $VERSION (tag: $TAG)"
+
+      # Download all build artifacts
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      # List downloaded artifacts
+      - name: List artifacts
+        run: |
+          echo "📦 Downloaded artifacts:"
+          find ./artifacts -type f | sort
+
+      # Create GitHub release using gh CLI for better artifact handling
+      - name: Create Release and Upload Assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Create release
+          gh release create ${{ steps.version.outputs.tag }} \
+            --title "Smart Dev Tools v${{ steps.version.outputs.version }}" \
+            --notes "# 🛠️ Smart Dev Tools v${{ steps.version.outputs.version }}
+          
+          A comprehensive suite of development tools built with Tauri, Vue 3, and TypeScript.
+          **Native compilation** ensures optimal performance and compatibility for each platform.
+          
+          ## 📦 Downloads
+          
+          All binaries are compiled natively on their target platforms for maximum compatibility:
+          
+          ### 🍎 macOS
+          - **Intel Macs (x86_64)**: Download the file ending with \`_x64.dmg\` - compiled on macOS Intel
+          - **Apple Silicon Macs (ARM64)**: Download the file ending with \`_aarch64.dmg\` - compiled on macOS ARM64
+          
+          ### 🪟 Windows  
+          - **Intel/AMD64**: Download files ending with \`_x64-setup.exe\` or \`_x64_en-US.msi\` - compiled on Windows x64
+          
+          ### 🐧 Linux
+          - **Intel/AMD64**: Download \`.deb\`, \`.rpm\`, or \`.AppImage\` files - compiled on Ubuntu 22.04 x64
+          
+          ## ✨ Features
+          
+          - **🔐 JWT Decoder** - Securely decode and analyze JWT tokens
+          - **📄 Base64 Converter** - Encode and decode text to/from Base64
+          - **📱 QR Generator** - Generate custom QR codes from text
+          - **🔍 Regex Tester** - Test regular expressions in real-time
+          - **✍️ Markdown Editor** - Edit Markdown with live preview
+          - **📊 Text Analyzer** - Analyze text metrics and statistics
+          - **📅 Date Converter** - Convert between date formats and timestamps
+          - **🔒 File Hasher** - Generate cryptographic hashes for files
+          
+          ## 🚀 Installation
+          
+          ### 🍎 macOS Installation
+          1. Download the appropriate DMG file for your Mac architecture
+          2. **If you see \"Smart Dev Tools is damaged\"**: This happens because the app is not notarized
+             - Right-click the DMG file and select \"Open\"
+             - Or go to System Preferences > Security & Privacy > General and click \"Open Anyway\"
+             - Alternatively, run this command in Terminal: \`sudo xattr -rd com.apple.quarantine /path/to/Smart\ Dev\ Tools.dmg\`
+          3. Drag the app to your Applications folder
+          
+          ### 🪟 Windows Installation
+          1. Download the appropriate file (.exe or .msi) for your architecture
+          2. Run the installer and follow the setup wizard
+          3. The app will be available in your Start Menu
+          
+          ### 🐧 Linux Installation
+          1. Download the appropriate file (.deb, .rpm, or .AppImage)
+          2. **For .deb**: \`sudo dpkg -i smart-dev-tools_*.deb\`
+          3. **For .rpm**: \`sudo rpm -i smart-dev-tools-*.rpm\`
+          4. **For .AppImage**: Make executable with \`chmod +x\` and run directly
+          
+          ## 📋 What's New
+          
+          See the [CHANGELOG.md](CHANGELOG.md) for detailed changes in this release.
+          
+          ---
+          
+          **Build Info:** Native compilation on each platform • All architectures built separately for maximum compatibility"
+          
+          # Prepare and upload all artifacts
+          mkdir -p ./release-assets
+          
+          find ./artifacts -type f \( -name "*.dmg" -o -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.exe" -o -name "*.msi" \) | while read file; do
+            filename=$(basename "$file")
+            # Rename files with version and architecture info
+            if [[ "$filename" == *.dmg ]]; then
+              if [[ "$file" == *"macos-13"* ]]; then
+                new_name="smart-dev-tools_${{ steps.version.outputs.version }}_x64.dmg"
+              elif [[ "$file" == *"macos-14"* ]]; then
+                new_name="smart-dev-tools_${{ steps.version.outputs.version }}_aarch64.dmg"
+              else
+                new_name="$filename"
+              fi
+            elif [[ "$filename" == *.exe ]]; then
+              new_name="smart-dev-tools_${{ steps.version.outputs.version }}_x64-setup.exe"
+            elif [[ "$filename" == *.msi ]]; then
+              new_name="smart-dev-tools_${{ steps.version.outputs.version }}_x64_en-US.msi"
+            elif [[ "$filename" == *.deb ]]; then
+              new_name="smart-dev-tools_${{ steps.version.outputs.version }}_amd64.deb"
+            elif [[ "$filename" == *.rpm ]]; then
+              new_name="smart-dev-tools_${{ steps.version.outputs.version }}_amd64.rpm"
+            elif [[ "$filename" == *.AppImage ]]; then
+              new_name="smart-dev-tools_${{ steps.version.outputs.version }}_amd64.AppImage"
+            else
+              new_name="$filename"
+            fi
+            
+            echo "Copying $file as $new_name"
+            cp "$file" "./release-assets/$new_name"
+          done
+          
+          # Upload all renamed artifacts
+          echo "Uploading all assets to release..."
+          find ./release-assets -type f | while read asset; do
+            echo "Uploading $(basename "$asset")"
+            gh release upload ${{ steps.version.outputs.tag }} "$asset"
+          done
