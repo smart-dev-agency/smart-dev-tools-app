@@ -41,6 +41,7 @@ import MarkdownEditor from "@/shared/componentes/MarkdownEditor.vue";
 import QrCodeTool from "@/shared/componentes/QrCodeTool.vue";
 import RegexTester from "@/shared/componentes/RegexTester.vue";
 import TextAnalyzer from "@/shared/componentes/TextAnalyzer.vue";
+import TextDiff from "@/shared/componentes/TextDiff.vue";
 import { computed, ref } from "vue";
 
 const componentMap = {
@@ -52,6 +53,7 @@ const componentMap = {
   "markdown-editor": MarkdownEditor,
   "regex-tester": RegexTester,
   "text-analyzer": TextAnalyzer,
+  "text-diff": TextDiff,
 };
 
 type ComponentKey = keyof typeof componentMap;
@@ -71,6 +73,7 @@ const categories = [
       { key: "regex-tester", label: "Regex Tester" },
       { key: "markdown-editor", label: "Markdown Editor" },
       { key: "text-analyzer", label: "Text Analyzer" },
+      { key: "text-diff", label: "Text Diff" },
     ],
   },
   {
