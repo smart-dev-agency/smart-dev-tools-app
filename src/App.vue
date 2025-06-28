@@ -6,6 +6,14 @@
         <button class="expand-btn" @click="toggleAllCategories" title="Expand/Collapse categories">
           <span>{{ allExpanded ? "▲" : "▼" }}</span>
         </button>
+        <button
+          class="update-btn"
+          @click="forceCheckForUpdates"
+          :disabled="isCheckingUpdates"
+          :title="isCheckingUpdates ? 'Checking for updates...' : 'Check for updates'"
+        >
+          <span>{{ isCheckingUpdates ? "⏳" : "🔄" }}</span>
+        </button>
       </div>
       <div class="sidebar-scroll">
         <div v-for="category in filteredCategories" :key="category.name" class="category">
@@ -26,9 +34,14 @@
         </div>
       </div>
     </aside>
-    <section class="component-viewer row m-0 g-0">
-      <component :is="currentComponent" />
-    </section>
+    <!-- Update Notification -->
+    <UpdateNotification
+      v-if="updateInfo"
+      v-model="showUpdateNotification"
+      :update-info="updateInfo"
+      @ignore-version="onIgnoreVersion"
+      @remind-later="onRemindLater"
+    />
   </div>
 </template>
 
@@ -40,15 +53,22 @@ import JwtDecode from "@/shared/componentes/JwtDecode.vue";
 import MarkdownEditor from "@/shared/componentes/MarkdownEditor.vue";
 import QrCodeTool from "@/shared/componentes/QrCodeTool.vue";
 import RegexTester from "@/shared/componentes/RegexTester.vue";
+import StringHasher from "@/shared/componentes/StringHasher.vue";
 import TextAnalyzer from "@/shared/componentes/TextAnalyzer.vue";
 import TextDiff from "@/shared/componentes/TextDiff.vue";
-import { computed, ref } from "vue";
+import TlsCertificateChecker from "@/shared/componentes/TlsCertificateChecker.vue";
+import { computed, onMounted, ref } from "vue";
+import UpdateNotification from "./shared/componentes/UpdateNotification.vue";
+import type { UpdateInfo } from "./shared/services/updateService";
+import { updateService } from "./shared/services/updateService";
 
 const componentMap = {
   "jwt-decode": JwtDecode,
   "date-converter": DateConverter,
   "base64-converter": Base64Converter,
   "file-hasher": FileHasher,
+  "string-hasher": StringHasher,
+  "tls-certificate-checker": TlsCertificateChecker,
   "qr-code-tool": QrCodeTool,
   "markdown-editor": MarkdownEditor,
   "regex-tester": RegexTester,
@@ -68,12 +88,17 @@ const categories = [
     ],
   },
   {
+    name: "Security Tools",
+    items: [{ key: "tls-certificate-checker", label: "TLS Certificate Checker" }],
+  },
+  {
     name: "Text Tools",
     items: [
       { key: "regex-tester", label: "Regex Tester" },
       { key: "markdown-editor", label: "Markdown Editor" },
       { key: "text-analyzer", label: "Text Analyzer" },
       { key: "text-diff", label: "Text Diff" },
+      { key: "string-hasher", label: "String Hasher" },
     ],
   },
   {
@@ -87,7 +112,6 @@ const categories = [
 ];
 
 const activeKey = ref<ComponentKey>("jwt-decode");
-const currentComponent = computed(() => componentMap[activeKey.value]);
 const searchText = ref("");
 const expandedCategories = ref<Set<string>>(new Set(categories.map((cat) => cat.name)));
 const allExpanded = ref(true);
@@ -129,6 +153,96 @@ function isCategoryExpanded(categoryName: string): boolean {
 function onSelect(key: ComponentKey) {
   activeKey.value = key;
 }
+
+// Update system
+const updateInfo = ref<UpdateInfo | null>(null);
+const showUpdateNotification = ref(false);
+const isCheckingUpdates = ref(false);
+const isInitialCheck = ref(true);
+const debugMessage = ref("Click the update button to test");
+
+async function checkForUpdates(): Promise<void> {
+  if (isInitialCheck.value) {
+    isCheckingUpdates.value = true;
+  }
+
+  try {
+    // Force check for updates at startup - only show notification if update is available
+    const update = await updateService.forceCheckForUpdates();
+    if (update.hasUpdate && !updateService.isVersionIgnored(update.latestVersion)) {
+      updateInfo.value = update;
+      showUpdateNotification.value = true;
+    }
+    // Silent if no updates available (no alert shown)
+  } catch (error) {
+    console.error("Error checking for updates:", error);
+    // In case of error at startup, try silent verification
+    try {
+      const update = await updateService.checkForUpdatesIfNeeded();
+      if (update && update.hasUpdate && !updateService.isVersionIgnored(update.latestVersion)) {
+        updateInfo.value = update;
+        showUpdateNotification.value = true;
+      }
+    } catch (fallbackError) {
+      console.error("Fallback update check also failed:", fallbackError);
+    }
+  } finally {
+    if (isInitialCheck.value) {
+      isCheckingUpdates.value = false;
+      isInitialCheck.value = false;
+    }
+  }
+}
+
+async function forceCheckForUpdates(): Promise<void> {
+  if (isCheckingUpdates.value) return;
+
+  debugMessage.value = "Button was clicked! Function started...";
+  isCheckingUpdates.value = true;
+
+  try {
+    debugMessage.value = "Getting current version...";
+    const currentVersion = await updateService.getCurrentVersion();
+
+    debugMessage.value = `Current version: ${currentVersion}. Getting latest release...`;
+    const latestRelease = await updateService.getLatestRelease();
+
+    debugMessage.value = `Latest release: ${latestRelease.tag_name}. Doing comparison...`;
+    const update = await updateService.forceCheckForUpdates();
+
+    debugMessage.value = `Comparison done. Has update: ${update.hasUpdate}`;
+
+    if (update.hasUpdate) {
+      updateInfo.value = update;
+      showUpdateNotification.value = true;
+      debugMessage.value = "Update available! Showing notification.";
+    } else {
+      // Show notification even when no updates are available for manual checks
+      updateInfo.value = update;
+      showUpdateNotification.value = true;
+      debugMessage.value = "You have the latest version available. Showing confirmation.";
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    debugMessage.value = `Error: ${errorMessage}`;
+  } finally {
+    isCheckingUpdates.value = false;
+  }
+}
+
+function onIgnoreVersion(): void {
+  showUpdateNotification.value = false;
+}
+
+function onRemindLater(): void {
+  showUpdateNotification.value = false;
+}
+
+// Check for updates when the app starts
+onMounted(() => {
+  // Verificar actualizaciones más rápidamente al inicio
+  setTimeout(checkForUpdates, 1000);
+});
 </script>
 
 <style scoped>
@@ -204,6 +318,32 @@ function onSelect(key: ComponentKey) {
 
 .expand-btn:hover {
   background: var(--button-active-bg);
+}
+
+.update-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--button-bg);
+  color: var(--button-color);
+  border: none;
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  font-size: 1.2em;
+  cursor: pointer;
+  transition: all 0.2s;
+  opacity: 0.8;
+}
+
+.update-btn:hover:not(:disabled) {
+  background: var(--button-active-bg);
+  opacity: 1;
+}
+
+.update-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .sidebar-scroll {
