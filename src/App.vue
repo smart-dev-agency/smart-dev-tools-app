@@ -34,7 +34,9 @@
         </div>
       </div>
     </aside>
-    <!-- Update Notification -->
+    <section class="component-viewer row m-0 g-0">
+      <component :is="currentComponent" />
+    </section>
     <UpdateNotification
       v-if="updateInfo"
       v-model="showUpdateNotification"
@@ -112,6 +114,7 @@ const categories = [
 ];
 
 const activeKey = ref<ComponentKey>("jwt-decode");
+const currentComponent = computed(() => componentMap[activeKey.value]);
 const searchText = ref("");
 const expandedCategories = ref<Set<string>>(new Set(categories.map((cat) => cat.name)));
 const allExpanded = ref(true);

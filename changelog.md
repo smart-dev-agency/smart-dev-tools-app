@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.3.1] - 2025-06-28
+
+### FIX
+
+* Fix component selector
+
 ## [1.3.0] - 2025-06-28
 
 ### Added

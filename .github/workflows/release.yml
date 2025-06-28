@@ -1,7 +1,7 @@
 # Official Release Workflow
-# 
+#
 # This workflow builds native binaries for each platform using their respective runners:
-# - macOS Intel: Built on macos-13 (Intel hardware) 
+# - macOS Intel: Built on macos-13 (Intel hardware)
 # - macOS Apple Silicon: Built on macos-14 (ARM64 hardware)
 # - Linux x86_64: Built on ubuntu-22.04 (x86_64 hardware)
 # - Windows x86_64: Built on windows-latest (x86_64 hardware)
@@ -9,22 +9,22 @@
 # No cross-compilation is used - each binary is compiled natively on its target platform
 # to ensure maximum compatibility and performance.
 
-name: 'Official Release'
+name: "Official Release"
 
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
   repository_dispatch:
     types: [release_requested]
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release'
+        description: "Tag to release"
         required: true
         type: string
       version:
-        description: 'Version to release'
+        description: "Version to release"
         required: true
         type: string
 
@@ -37,29 +37,29 @@ jobs:
       matrix:
         include:
           # macOS Intel (x86_64) - compiled natively on Intel runner
-          - platform: 'macos-13'
-            args: ''
+          - platform: "macos-13"
+            args: ""
             target: x86_64-apple-darwin
-            arch: 'Intel'
-            runner_arch: 'x64'
+            arch: "Intel"
+            runner_arch: "x64"
           # macOS Apple Silicon (ARM64) - compiled natively on ARM runner
-          - platform: 'macos-14'
-            args: ''
+          - platform: "macos-14"
+            args: ""
             target: aarch64-apple-darwin
-            arch: 'Apple Silicon'
-            runner_arch: 'arm64'
+            arch: "Apple Silicon"
+            runner_arch: "arm64"
           # Linux x86_64 - compiled natively
-          - platform: 'ubuntu-22.04'
-            args: ''
+          - platform: "ubuntu-22.04"
+            args: ""
             target: x86_64-unknown-linux-gnu
-            arch: 'x86_64'
-            runner_arch: 'x64'
+            arch: "x86_64"
+            runner_arch: "x64"
           # Windows x86_64 - compiled natively
-          - platform: 'windows-latest'
-            args: ''
+          - platform: "windows-latest"
+            args: ""
             target: x86_64-pc-windows-msvc
-            arch: 'x86_64'
-            runner_arch: 'x64'
+            arch: "x86_64"
+            runner_arch: "x64"
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -86,7 +86,7 @@ jobs:
           echo "Platform: ${{ matrix.platform }}"
           echo "Target: ${{ matrix.target }}"
           echo "Expected Arch: ${{ matrix.arch }}"
-          
+
           if [[ "${{ runner.os }}" == "macOS" ]]; then
             echo "System arch: $(uname -m)"
             echo "Xcode path: $(xcode-select -p)"
@@ -97,20 +97,20 @@ jobs:
           elif [[ "${{ runner.os }}" == "Windows" ]]; then
             echo "System arch: $env:PROCESSOR_ARCHITECTURE"
           fi
-          
+
           echo "Rust default host: $(rustc -vV | grep host | sed 's/host: //')"
           echo "✅ Using native compilation - no cross-compilation targets needed"
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: './src-tauri -> target'
+          workspaces: "./src-tauri -> target"
 
       - name: Sync node version and setup cache
         uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
-          cache: 'yarn'
+          node-version: "lts/*"
+          cache: "yarn"
 
       - name: Install frontend dependencies
         run: yarn install
@@ -134,11 +134,11 @@ jobs:
           echo "About to build with yarn tauri build (native compilation)"
           echo "No cross-compilation targets will be specified"
           echo "Platform: ${{ matrix.platform }} → ${{ matrix.arch }}"
-          
+
           # Show project info
           echo "📦 Project info:"
           cat package.json | grep -E '"name"|"version"'
-          
+
           # Verify Tauri config
           echo "⚙️ Tauri config:"
           cat src-tauri/tauri.conf.json | grep -E '"productName"|"version"|"identifier"'
@@ -175,7 +175,7 @@ jobs:
         shell: bash
         run: |
           echo "🔍 Finding build artifacts..."
-          
+
           # Check if bundle directory exists
           if [[ -d "src-tauri/target/release/bundle" ]]; then
             cd src-tauri/target/release/bundle
@@ -300,18 +300,18 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           echo "Extracting changelog for version $VERSION"
-          
+
           # Extract changelog section for this version
           CHANGELOG_CONTENT=$(awk "/^## \[$VERSION\]/{flag=1; next} /^## \[/{flag=0} flag" changelog.md | sed '/^$/d' | head -20)
-          
+
           if [ -z "$CHANGELOG_CONTENT" ]; then
             echo "No changelog found for version $VERSION"
             CHANGELOG_CONTENT="- No specific changelog available for this version"
           fi
-          
+
           # Save changelog to file for multiline output
           echo "$CHANGELOG_CONTENT" > /tmp/changelog.txt
-          
+
           # Set output using file
           {
             echo 'content<<EOF'
@@ -350,15 +350,15 @@ jobs:
           ## ⚠️ macOS Installation Note
           If you see \"Smart Dev Tools is damaged\", run:
           \`\`\`bash
-          sudo xattr -rd com.apple.quarantine /path/to/file.dmg
+          sudo xattr -rd com.apple.quarantine /Applications/Smart\ Dev\ Tools.app
           \`\`\`
 
           ---
           *Native compilation on each platform for maximum compatibility*"
-          
+
           # Prepare and upload all artifacts
           mkdir -p ./release-assets
-          
+
           find ./artifacts -type f \( -name "*.dmg" -o -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.exe" -o -name "*.msi" \) | while read file; do
             filename=$(basename "$file")
             # Rename files with version and architecture info
@@ -387,7 +387,7 @@ jobs:
             echo "Copying $file as $new_name"
             cp "$file" "./release-assets/$new_name"
           done
-          
+
           # Upload all renamed artifacts
           echo "Uploading all assets to release..."
           find ./release-assets -type f | while read asset; do

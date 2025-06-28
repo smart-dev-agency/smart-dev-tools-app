@@ -1,6 +1,6 @@
 [package]
 name = "smart-dev-tools"
-version = "1.3.0"
+version = "1.3.1"
 description = "A Tauri App"
 authors = ["Smart Dev Agency"]
 edition = "2021"
