@@ -498,7 +498,6 @@ function normalizeText(text: string): string {
   color: var(--text-primary);
 }
 
-// Estilos para diferencias
 :deep(.added-text) {
   background-color: rgba(34, 197, 94, 0.3);
   border-radius: 3px;

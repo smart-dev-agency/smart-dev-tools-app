@@ -29,7 +29,6 @@ export class UpdateService {
     try {
       return await invoke<string>("get_app_version");
     } catch (error) {
-      console.error("Error obteniendo la versión actual:", error);
       throw new Error("No se pudo obtener la versión actual de la aplicación");
     }
   }
@@ -123,7 +122,6 @@ export class UpdateService {
       this.setLastCheckDate();
       return updateInfo;
     } catch (error) {
-      console.error("Error en verificación automática de actualizaciones:", error);
       return null;
     }
   }

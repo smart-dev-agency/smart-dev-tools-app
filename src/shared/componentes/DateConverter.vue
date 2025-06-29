@@ -5,7 +5,7 @@
         <div class="d-flex flex-column h-100">
           <BaseInput v-model="inputDate" placeholder="Enter a date, epoch, or timestamp" class="mb-3" />
           <BaseButton @click="convertDate" class="mb-3">Convert</BaseButton>
-          
+
           <div class="input-group mb-3">
             <label>Input Format:</label>
             <select v-model="inputFormat" class="form-select">
@@ -50,34 +50,32 @@
             </div>
           </div>
         </BasePanel>
-        <div v-else class="placeholder-text">
-          Enter a date to see all conversions
-        </div>
+        <div v-else class="placeholder-text">Enter a date to see all conversions</div>
       </section>
     </BaseCard>
   </ComponentViewer>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import BaseButton from './BaseButton.vue';
-import BaseCard from './BaseCard.vue';
-import BaseInput from './BaseInput.vue';
-import BasePanel from './BasePanel.vue';
-import ComponentViewer from './ComponentViewer.vue';
+import { computed, ref } from "vue";
+import BaseButton from "./BaseButton.vue";
+import BaseCard from "./BaseCard.vue";
+import BaseInput from "./BaseInput.vue";
+import BasePanel from "./BasePanel.vue";
+import ComponentViewer from "./ComponentViewer.vue";
 
-const inputDate = ref('');
-const inputFormat = ref('auto');
+const inputDate = ref("");
+const inputFormat = ref("auto");
 const dateObj = ref<Date | null>(null);
-const error = ref('');
+const error = ref("");
 
 const localDate = computed(() => dateObj.value?.toLocaleString());
 const utcDate = computed(() => dateObj.value?.toUTCString());
 const isoDate = computed(() => dateObj.value?.toISOString());
-const epoch = computed(() => dateObj.value ? Math.floor(dateObj.value.getTime() / 1000) : null);
+const epoch = computed(() => (dateObj.value ? Math.floor(dateObj.value.getTime() / 1000) : null));
 const timestamp = computed(() => dateObj.value?.getTime());
 const conversionsText = computed(() => {
-  if (!dateObj.value) return '';
+  if (!dateObj.value) return "";
   return `Local: ${localDate.value}
 UTC: ${utcDate.value}
 ISO: ${isoDate.value}
@@ -86,7 +84,7 @@ Timestamp: ${timestamp.value}`;
 });
 
 const relative = computed(() => {
-  if (!dateObj.value) return '';
+  if (!dateObj.value) return "";
   const now = new Date();
   const diff = now.getTime() - dateObj.value.getTime();
   const seconds = Math.floor(Math.abs(diff) / 1000);
@@ -108,11 +106,11 @@ const relative = computed(() => {
 });
 
 function convertDate() {
-  error.value = '';
+  error.value = "";
   dateObj.value = null;
-  
+
   if (!inputDate.value) {
-    error.value = 'Please enter a date';
+    error.value = "Please enter a date";
     return;
   }
 
@@ -120,25 +118,25 @@ function convertDate() {
     let date: Date | null = null;
 
     switch (inputFormat.value) {
-      case 'epoch':
+      case "epoch":
         date = new Date(parseInt(inputDate.value) * 1000);
         break;
-      case 'timestamp':
+      case "timestamp":
         date = new Date(parseInt(inputDate.value));
         break;
-      case 'iso':
+      case "iso":
         date = new Date(inputDate.value);
         break;
-      case 'human':
+      case "human":
         date = new Date(inputDate.value);
         break;
-      case 'auto':
+      case "auto":
       default:
         if (/^\d+$/.test(inputDate.value)) {
           if (inputDate.value.length <= 10) {
-            date = new Date(parseInt(inputDate.value) * 1000); // epoch
+            date = new Date(parseInt(inputDate.value) * 1000);
           } else {
-            date = new Date(parseInt(inputDate.value)); // timestamp
+            date = new Date(parseInt(inputDate.value));
           }
         } else {
           date = new Date(inputDate.value);
@@ -146,12 +144,12 @@ function convertDate() {
     }
 
     if (isNaN(date.getTime())) {
-      throw new Error('Invalid date');
+      throw new Error("Invalid date");
     }
 
     dateObj.value = date;
   } catch (e) {
-    error.value = 'Could not convert the date. Please check the format.';
+    error.value = "Could not convert the date. Please check the format.";
   }
 }
 </script>
@@ -161,7 +159,7 @@ function convertDate() {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  
+
   label {
     font-weight: 500;
   }
@@ -175,7 +173,7 @@ function convertDate() {
   color: var(--input-color);
   font-size: 1em;
   transition: all 0.2s ease;
-  
+
   &:focus {
     border-color: var(--button-bg);
     outline: none;
@@ -196,15 +194,15 @@ function convertDate() {
   background: var(--code-bg);
   padding: 0.75rem;
   border-radius: 6px;
-  
+
   strong {
     color: #0090ff;
     font-size: 0.9rem;
     opacity: 0.9;
   }
-  
+
   div {
-    font-family: 'Monaco', 'Menlo', 'Courier New', Courier, monospace;
+    font-family: "Monaco", "Menlo", "Courier New", Courier, monospace;
     font-size: 0.9rem;
     color: var(--code-color);
   }

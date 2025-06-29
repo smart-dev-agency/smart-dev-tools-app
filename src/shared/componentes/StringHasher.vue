@@ -91,7 +91,7 @@ function generateFallbackHash(text: string, length: number): string {
   for (let i = 0; i < text.length; i++) {
     const char = text.charCodeAt(i);
     hash = (hash << 5) - hash + char;
-    hash = hash & hash; // Convert to 32bit integer
+    hash = hash & hash;
   }
 
   let hashStr = "";
@@ -153,7 +153,6 @@ async function calculateHashes() {
     }
   } catch (e: any) {
     error.value = `Error calculating hashes: ${e.message || "Unknown error"}`;
-    console.error("Hash calculation error:", e);
   }
 }
 

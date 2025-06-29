@@ -132,7 +132,6 @@ async function generateQR() {
 
     qrDataUrl.value = await QRCode.toDataURL(qrContent.value, options);
   } catch (err: any) {
-    console.error("Error generating QR:", err);
     error.value = `Error generating QR code: ${err.message}`;
     qrDataUrl.value = "";
   } finally {
@@ -157,7 +156,6 @@ async function copyQR() {
       copied.value = false;
     }, 2000);
   } catch (err: any) {
-    console.error("Error copying image to clipboard:", err);
     error.value = `Could not copy image to clipboard: ${err instanceof Error ? err.message : String(err)}`;
   }
 }
@@ -195,7 +193,6 @@ async function scanQRCode(file: File) {
       scanError.value = "No QR code detected in the image";
     }
   } catch (err: any) {
-    console.error("Error scanning QR:", err);
     scanError.value = `Error processing image: ${err.message}`;
   } finally {
     isLoading.value = false;

@@ -82,7 +82,6 @@ const formattedReleaseNotes = computed(() => {
     const html = marked(props.updateInfo.releaseNotes) as string;
     return DOMPurify.sanitize(html);
   } catch (error) {
-    console.error("Error formatting release notes:", error);
     return props.updateInfo.releaseNotes;
   }
 });
@@ -112,8 +111,6 @@ async function openDownloadPage(): Promise<void> {
 
     closeNotification();
   } catch (error) {
-    console.error("Error opening download page with Tauri:", error);
-
     try {
       const success = window.open(props.updateInfo.releaseUrl, "_blank");
 
@@ -123,7 +120,6 @@ async function openDownloadPage(): Promise<void> {
 
       closeNotification();
     } catch (fallbackError) {
-      console.error("Fallback window.open also failed:", fallbackError);
       alert(`Error opening page. Please visit manually:\n${props.updateInfo.releaseUrl}`);
       closeNotification();
     }
@@ -166,6 +162,12 @@ function ignoreVersion(): void {
   overflow-y: auto;
   margin: 20px;
   border: 1px solid var(--border-color, #e5e5e5);
+
+  @media (prefers-color-scheme: dark) {
+    background: var(--bg-color, #1f2937);
+    border-color: var(--border-color, #374151);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  }
 }
 
 .notification-header {
@@ -180,6 +182,14 @@ function ignoreVersion(): void {
     font-size: 1.25rem;
     font-weight: 600;
     color: var(--text-primary, #111827);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    border-bottom-color: var(--border-color, #374151);
+
+    h3 {
+      color: var(--text-primary, #f9fafb);
+    }
   }
 
   .close-btn {
@@ -201,6 +211,15 @@ function ignoreVersion(): void {
       background: var(--hover-bg, #f3f4f6);
       color: var(--text-primary, #111827);
     }
+
+    @media (prefers-color-scheme: dark) {
+      color: var(--text-secondary, #9ca3af);
+
+      &:hover {
+        background: var(--hover-bg, #374151);
+        color: var(--text-primary, #f9fafb);
+      }
+    }
   }
 }
 
@@ -214,6 +233,7 @@ function ignoreVersion(): void {
   p {
     margin: 8px 0;
     font-size: 0.95rem;
+    color: var(--text-primary, #374151);
 
     strong {
       color: var(--text-primary, #111827);
@@ -223,6 +243,20 @@ function ignoreVersion(): void {
   .published-date {
     color: var(--text-secondary, #6b7280);
     font-size: 0.9rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    p {
+      color: var(--text-primary, #d1d5db);
+
+      strong {
+        color: var(--text-primary, #f9fafb);
+      }
+    }
+
+    .published-date {
+      color: var(--text-secondary, #9ca3af);
+    }
   }
 }
 
@@ -238,6 +272,14 @@ function ignoreVersion(): void {
     border-radius: 8px;
     padding: 16px;
     margin: 0;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    p {
+      color: var(--text-primary, #f9fafb);
+      background: var(--success-bg, #064e3b);
+      border-color: var(--success-border, #059669);
+    }
   }
 }
 
@@ -258,6 +300,7 @@ function ignoreVersion(): void {
     overflow-y: auto;
     font-size: 0.9rem;
     line-height: 1.5;
+    color: var(--text-primary, #374151);
 
     :deep(h1),
     :deep(h2),
@@ -268,10 +311,12 @@ function ignoreVersion(): void {
       margin-top: 0;
       margin-bottom: 8px;
       font-size: 1rem;
+      color: var(--text-primary, #111827);
     }
 
     :deep(p) {
       margin: 8px 0;
+      color: var(--text-primary, #374151);
     }
 
     :deep(ul),
@@ -282,6 +327,7 @@ function ignoreVersion(): void {
 
     :deep(li) {
       margin: 4px 0;
+      color: var(--text-primary, #374151);
     }
 
     :deep(code) {
@@ -291,6 +337,7 @@ function ignoreVersion(): void {
       border: 1px solid var(--border-color, #e5e5e5);
       font-family: "Monaco", "Menlo", "Courier New", Courier, monospace;
       font-size: 0.85rem;
+      color: var(--text-primary, #111827);
     }
 
     :deep(pre) {
@@ -305,6 +352,43 @@ function ignoreVersion(): void {
         background: none;
         border: none;
         padding: 0;
+      }
+    }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    h4 {
+      color: var(--text-primary, #f9fafb);
+    }
+
+    .notes-content {
+      background: var(--code-bg, #111827);
+      border-color: var(--border-color, #374151);
+      color: var(--text-primary, #d1d5db);
+
+      :deep(h1),
+      :deep(h2),
+      :deep(h3),
+      :deep(h4),
+      :deep(h5),
+      :deep(h6) {
+        color: var(--text-primary, #f9fafb);
+      }
+
+      :deep(p),
+      :deep(li) {
+        color: var(--text-primary, #d1d5db);
+      }
+
+      :deep(code) {
+        background: var(--bg-color, #1f2937);
+        border-color: var(--border-color, #374151);
+        color: var(--text-primary, #f9fafb);
+      }
+
+      :deep(pre) {
+        background: var(--bg-color, #1f2937);
+        border-color: var(--border-color, #374151);
       }
     }
   }
@@ -356,6 +440,41 @@ function ignoreVersion(): void {
       &:hover {
         background: var(--hover-bg, #f3f4f6);
         color: var(--text-primary, #111827);
+      }
+    }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    border-top-color: var(--border-color, #374151);
+
+    button {
+      &.btn-primary {
+        background: var(--primary-color, #60a5fa);
+        border-color: var(--primary-color, #60a5fa);
+
+        &:hover {
+          background: var(--primary-hover, #3b82f6);
+          border-color: var(--primary-hover, #3b82f6);
+        }
+      }
+
+      &.btn-secondary {
+        background: var(--bg-color, #1f2937);
+        color: var(--text-primary, #f9fafb);
+        border-color: var(--border-color, #374151);
+
+        &:hover {
+          background: var(--hover-bg, #374151);
+        }
+      }
+
+      &.btn-ghost {
+        color: var(--text-secondary, #9ca3af);
+
+        &:hover {
+          background: var(--hover-bg, #374151);
+          color: var(--text-primary, #f9fafb);
+        }
       }
     }
   }

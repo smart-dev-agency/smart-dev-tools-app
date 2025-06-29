@@ -78,7 +78,6 @@ async function processFile(file: File) {
 
     hashes.value = calculatedHashes;
   } catch (e: any) {
-    console.error("Error processing file", e);
     error.value = `Error processing file: ${e.message}`;
     fileName.value = null;
   } finally {

@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.4.0] - 2025-06-28
+
+### Added
+
+- **Home Component**: New welcome screen with application overview and usage instructions
+  - Comprehensive introduction to Smart Dev Tools
+  - Step-by-step usage guide for new users
+  - Useful tips about privacy, performance, and features
+  - Responsive design with dark mode support
+
+### Improved
+
+- **Dark Mode Support**: Enhanced dark mode compatibility across all components
+
+  - TLS Certificate Checker: Improved tabs and raw certificate display in dark mode
+  - Update Notification: Better contrast and readability in dark mode
+  - Consistent color schemes across all UI elements
+- **User Experience**:
+
+  - Home button prominently placed at top of sidebar
+  - Simplified release notes in GitHub releases
+
 ## [1.3.1] - 2025-06-28
 
 ### FIX

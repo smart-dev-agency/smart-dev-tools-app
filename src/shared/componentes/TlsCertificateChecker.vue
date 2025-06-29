@@ -273,7 +273,6 @@ const isLoading = ref(false);
 const certificateInfo = ref<CertificateChainInfo | null>(null);
 const copySuccess = ref<Record<number, boolean>>({});
 
-// Tab management
 const tabs = [
   { id: "basic", label: "Basic" },
   { id: "security", label: "Security" },
@@ -320,7 +319,6 @@ async function checkCertificate() {
     }
   } catch (e: any) {
     error.value = `Error checking certificate: ${e || "Unknown error"}`;
-    console.error("Certificate check error:", e);
   } finally {
     isLoading.value = false;
   }
@@ -340,7 +338,6 @@ async function copyCertificate(pemData: string, certIndex: number) {
       copySuccess.value[certIndex] = false;
     }, 2000);
   } catch (err) {
-    console.error("Failed to copy certificate:", err);
     error.value = "Failed to copy certificate to clipboard";
   }
 }
@@ -364,7 +361,6 @@ async function downloadSingleCertificate(cert: CertificateDetails, format: "pem"
         }
         extension = "der";
       } catch (decodeError) {
-        console.error("Error decoding base64:", decodeError);
         error.value = "Error decoding certificate data";
         return;
       }
@@ -378,7 +374,6 @@ async function downloadSingleCertificate(cert: CertificateDetails, format: "pem"
 
     await downloadWithTauri(data, filename);
   } catch (e: any) {
-    console.error("Download error:", e);
     error.value = `Error downloading certificate: ${e?.message || "Unknown error"}`;
   }
 }
@@ -399,12 +394,10 @@ async function downloadCertificate(format: "json") {
 
     await downloadWithTauri(data, filename);
   } catch (e: any) {
-    console.error("Download error:", e);
     error.value = `Error downloading certificate chain: ${e?.message || "Unknown error"}`;
   }
 }
 
-// Helper function that works with Tauri's native file system
 async function downloadWithTauri(data: Uint8Array, filename: string) {
   try {
     const filePath = await save({
@@ -426,9 +419,7 @@ async function downloadWithTauri(data: Uint8Array, filename: string) {
     }
 
     await writeFile(filePath, data);
-
   } catch (error) {
-
     throw new Error(`Download failed: ${error}`);
   }
 }
@@ -503,22 +494,40 @@ async function downloadWithTauri(data: Uint8Array, filename: string) {
   font-family: "Monaco", "Menlo", "Courier New", Courier, monospace;
   font-size: 0.85rem;
   background: var(--code-bg, #f5f5f5);
+  border: 1px solid var(--border-color, #e5e5e5);
+  color: var(--text-primary, #111827);
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   word-break: break-all;
   display: inline-block;
   max-width: 100%;
+  transition: all 0.2s;
+
+  @media (prefers-color-scheme: dark) {
+    background: var(--code-bg, #1f2937);
+    border-color: var(--border-color, #374151);
+    color: var(--text-primary, #f9fafb);
+  }
 }
 
 .fingerprint {
   font-family: "Monaco", "Menlo", "Courier New", Courier, monospace;
   font-size: 0.85rem;
   background: var(--code-bg, #f5f5f5);
+  border: 1px solid var(--border-color, #e5e5e5);
+  color: var(--text-primary, #111827);
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   word-break: break-all;
   display: block;
   margin-top: 0.25rem;
+  transition: all 0.2s;
+
+  @media (prefers-color-scheme: dark) {
+    background: var(--code-bg, #1f2937);
+    border-color: var(--border-color, #374151);
+    color: var(--text-primary, #f9fafb);
+  }
 }
 
 .san-list,
@@ -560,6 +569,7 @@ async function downloadWithTauri(data: Uint8Array, filename: string) {
     color: var(--text-secondary, #6b7280);
     font-weight: 500;
     transition: all 0.2s;
+    border-radius: 4px 4px 0 0;
 
     &:hover {
       background: var(--hover-bg, #f3f4f6);
@@ -569,6 +579,21 @@ async function downloadWithTauri(data: Uint8Array, filename: string) {
     &.active {
       color: var(--primary-color, #3b82f6);
       border-bottom-color: var(--primary-color, #3b82f6);
+      background: var(--tab-active-bg, rgba(59, 130, 246, 0.1));
+    }
+
+    @media (prefers-color-scheme: dark) {
+      color: var(--text-secondary, #9ca3af);
+
+      &:hover {
+        background: var(--hover-bg, #374151);
+        color: var(--text-primary, #f9fafb);
+      }
+
+      &.active {
+        color: var(--primary-color, #60a5fa);
+        background: var(--tab-active-bg, rgba(96, 165, 250, 0.2));
+      }
     }
   }
 
@@ -593,6 +618,26 @@ async function downloadWithTauri(data: Uint8Array, filename: string) {
       resize: vertical;
       white-space: pre;
       overflow: auto;
+      color: var(--text-primary, #111827);
+      transition: all 0.2s;
+
+      @media (prefers-color-scheme: dark) {
+        background: var(--code-bg, #1f2937);
+        border-color: var(--border-color, #374151);
+        color: var(--text-primary, #f9fafb);
+
+        &:focus {
+          border-color: var(--primary-color, #60a5fa);
+          outline: none;
+          box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+        }
+      }
+
+      &:focus {
+        border-color: var(--primary-color, #3b82f6);
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+      }
     }
 
     .cert-actions {
@@ -676,7 +721,6 @@ async function downloadWithTauri(data: Uint8Array, filename: string) {
   border: 1px solid var(--success-color, #22c55e);
 }
 
-// Responsive design
 @media (max-width: 768px) {
   .input-row {
     flex-direction: column;

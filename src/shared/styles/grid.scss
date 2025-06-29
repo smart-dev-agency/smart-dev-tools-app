@@ -16,7 +16,6 @@
   margin-left: auto;
 }
 
-// Row
 .row {
   --bs-gutter-x: 1.5rem;
   --bs-gutter-y: 0;
@@ -37,7 +36,6 @@
   margin-top: var(--bs-gutter-y);
 }
 
-// Columnas
 @for $i from 1 through 12 {
   .col-#{$i} {
     flex: 0 0 auto;
@@ -45,7 +43,6 @@
   }
 }
 
-// Breakpoints responsive
 $grid-breakpoints: (
   sm: 576px,
   md: 768px,
@@ -79,7 +76,6 @@ $grid-breakpoints: (
   }
 }
 
-// Utilidades de flex
 .d-flex {
   display: flex !important;
 }
@@ -138,7 +134,6 @@ $grid-breakpoints: (
   align-items: stretch !important;
 }
 
-// Gaps
 .gap-0 {
   gap: 0 !important;
 }
@@ -158,7 +153,6 @@ $grid-breakpoints: (
   gap: 3rem !important;
 }
 
-// Margins
 .m-0 {
   margin: 0 !important;
 }
@@ -304,7 +298,6 @@ $grid-breakpoints: (
   margin-bottom: 3rem !important;
 }
 
-// Paddings
 .p-0 {
   padding: 0 !important;
 }

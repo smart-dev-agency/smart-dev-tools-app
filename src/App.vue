@@ -16,6 +16,10 @@
         </button>
       </div>
       <div class="sidebar-scroll">
+        <div class="home-section">
+          <button :class="['sidebar-btn', 'home-btn', { active: activeKey === 'home' }]" @click="onSelect('home' as ComponentKey)">🏠 Home</button>
+        </div>
+
         <div v-for="category in filteredCategories" :key="category.name" class="category">
           <div class="category-title" @click="toggleCategory(category.name)">
             <span>{{ category.name }}</span>
@@ -51,6 +55,7 @@
 import Base64Converter from "@/shared/componentes/Base64Converter.vue";
 import DateConverter from "@/shared/componentes/DateConverter.vue";
 import FileHasher from "@/shared/componentes/FileHasher.vue";
+import Home from "@/shared/componentes/Home.vue";
 import JwtDecode from "@/shared/componentes/JwtDecode.vue";
 import MarkdownEditor from "@/shared/componentes/MarkdownEditor.vue";
 import QrCodeTool from "@/shared/componentes/QrCodeTool.vue";
@@ -65,6 +70,7 @@ import type { UpdateInfo } from "./shared/services/updateService";
 import { updateService } from "./shared/services/updateService";
 
 const componentMap = {
+  home: Home,
   "jwt-decode": JwtDecode,
   "date-converter": DateConverter,
   "base64-converter": Base64Converter,
@@ -113,11 +119,11 @@ const categories = [
   },
 ];
 
-const activeKey = ref<ComponentKey>("jwt-decode");
+const activeKey = ref<ComponentKey>("home");
 const currentComponent = computed(() => componentMap[activeKey.value]);
 const searchText = ref("");
-const expandedCategories = ref<Set<string>>(new Set(categories.map((cat) => cat.name)));
-const allExpanded = ref(true);
+const expandedCategories = ref<Set<string>>(new Set());
+const allExpanded = ref(false);
 
 const filteredCategories = computed(() => {
   if (!searchText.value) return categories;
@@ -157,12 +163,10 @@ function onSelect(key: ComponentKey) {
   activeKey.value = key;
 }
 
-// Update system
 const updateInfo = ref<UpdateInfo | null>(null);
 const showUpdateNotification = ref(false);
 const isCheckingUpdates = ref(false);
 const isInitialCheck = ref(true);
-const debugMessage = ref("Click the update button to test");
 
 async function checkForUpdates(): Promise<void> {
   if (isInitialCheck.value) {
@@ -170,16 +174,12 @@ async function checkForUpdates(): Promise<void> {
   }
 
   try {
-    // Force check for updates at startup - only show notification if update is available
     const update = await updateService.forceCheckForUpdates();
     if (update.hasUpdate && !updateService.isVersionIgnored(update.latestVersion)) {
       updateInfo.value = update;
       showUpdateNotification.value = true;
     }
-    // Silent if no updates available (no alert shown)
   } catch (error) {
-    console.error("Error checking for updates:", error);
-    // In case of error at startup, try silent verification
     try {
       const update = await updateService.checkForUpdatesIfNeeded();
       if (update && update.hasUpdate && !updateService.isVersionIgnored(update.latestVersion)) {
@@ -200,34 +200,23 @@ async function checkForUpdates(): Promise<void> {
 async function forceCheckForUpdates(): Promise<void> {
   if (isCheckingUpdates.value) return;
 
-  debugMessage.value = "Button was clicked! Function started...";
   isCheckingUpdates.value = true;
 
   try {
-    debugMessage.value = "Getting current version...";
-    const currentVersion = await updateService.getCurrentVersion();
+    await updateService.getCurrentVersion();
 
-    debugMessage.value = `Current version: ${currentVersion}. Getting latest release...`;
-    const latestRelease = await updateService.getLatestRelease();
+    await updateService.getLatestRelease();
 
-    debugMessage.value = `Latest release: ${latestRelease.tag_name}. Doing comparison...`;
     const update = await updateService.forceCheckForUpdates();
-
-    debugMessage.value = `Comparison done. Has update: ${update.hasUpdate}`;
 
     if (update.hasUpdate) {
       updateInfo.value = update;
       showUpdateNotification.value = true;
-      debugMessage.value = "Update available! Showing notification.";
     } else {
-      // Show notification even when no updates are available for manual checks
       updateInfo.value = update;
       showUpdateNotification.value = true;
-      debugMessage.value = "You have the latest version available. Showing confirmation.";
     }
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    debugMessage.value = `Error: ${errorMessage}`;
   } finally {
     isCheckingUpdates.value = false;
   }
@@ -241,9 +230,7 @@ function onRemindLater(): void {
   showUpdateNotification.value = false;
 }
 
-// Check for updates when the app starts
 onMounted(() => {
-  // Verificar actualizaciones más rápidamente al inicio
   setTimeout(checkForUpdates, 1000);
 });
 </script>
@@ -355,6 +342,12 @@ onMounted(() => {
   padding: 0 16px 16px 16px;
   margin-right: -8px;
   padding-right: calc(16px + 8px);
+}
+
+.home-section {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--sidebar-border);
 }
 
 .category {

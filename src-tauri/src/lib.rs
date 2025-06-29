@@ -1,4 +1,3 @@
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use base64::{engine::general_purpose, Engine as _};
 use rustls::{ClientConfig, ServerName};
 use serde::{Deserialize, Serialize};
@@ -36,7 +35,7 @@ pub struct CertificateDetails {
     pub ocsp_servers: Vec<String>,
     pub ca_issuers: Vec<String>,
     pub pem_certificate: String,
-    pub der_certificate: String, // Base64 encoded DER
+    pub der_certificate: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,28 +57,27 @@ fn greet(name: &str) -> String {
 }
 
 #[tauri::command]
-async fn get_tls_certificate_info(hostname: String, port: Option<u16>) -> Result<CertificateChainInfo, String> {
+async fn get_tls_certificate_info(
+    hostname: String,
+    port: Option<u16>,
+) -> Result<CertificateChainInfo, String> {
     let port = port.unwrap_or(443);
     let addr = format!("{}:{}", hostname, port);
-    
-    // Resolve the address
+
     let socket_addr = addr
         .to_socket_addrs()
         .map_err(|e| format!("Failed to resolve address {}: {}", addr, e))?
         .next()
         .ok_or_else(|| format!("No valid address found for {}", addr))?;
 
-    // Create TLS client configuration with system root certificates
     let mut root_store = rustls::RootCertStore::empty();
-    
-    // Add system certificates
+
     for cert in rustls_native_certs::load_native_certs()
-        .map_err(|e| format!("Failed to load native certificates: {}", e))? 
+        .map_err(|e| format!("Failed to load native certificates: {}", e))?
     {
         root_store.add(&rustls::Certificate(cert.0)).ok();
     }
-    
-    // Add webpki roots as fallback
+
     root_store.add_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
         rustls::OwnedTrustAnchor::from_subject_spki_name_constraints(
             ta.subject,
@@ -94,8 +92,7 @@ async fn get_tls_certificate_info(hostname: String, port: Option<u16>) -> Result
         .with_no_client_auth();
 
     let connector = TlsConnector::from(Arc::new(config));
-    
-    // Connect to the server
+
     let stream = TcpStream::connect(socket_addr)
         .await
         .map_err(|e| format!("Failed to connect to {}:{}: {}", hostname, port, e))?;
@@ -108,13 +105,19 @@ async fn get_tls_certificate_info(hostname: String, port: Option<u16>) -> Result
         .await
         .map_err(|e| format!("TLS handshake failed with {}:{}: {}", hostname, port, e))?;
 
-    // Get connection info
     let (_, connection) = tls_stream.into_inner();
-    
-    let tls_version = format!("{:?}", connection.protocol_version().unwrap_or(rustls::ProtocolVersion::TLSv1_2));
-    let cipher_suite = format!("{:?}", connection.negotiated_cipher_suite().unwrap().suite());
-    
-    // Get peer certificates
+
+    let tls_version = format!(
+        "{:?}",
+        connection
+            .protocol_version()
+            .unwrap_or(rustls::ProtocolVersion::TLSv1_2)
+    );
+    let cipher_suite = format!(
+        "{:?}",
+        connection.negotiated_cipher_suite().unwrap().suite()
+    );
+
     let peer_certs = connection
         .peer_certificates()
         .ok_or("No peer certificates found")?;
@@ -126,7 +129,6 @@ async fn get_tls_certificate_info(hostname: String, port: Option<u16>) -> Result
     let mut certificates = Vec::new();
     let mut chain_validation_errors = Vec::new();
 
-    // Process each certificate in the chain
     for (index, cert_der) in peer_certs.iter().enumerate() {
         match parse_certificate(&cert_der.0) {
             Ok(cert_details) => certificates.push(cert_details),
@@ -152,56 +154,55 @@ async fn get_tls_certificate_info(hostname: String, port: Option<u16>) -> Result
 }
 
 fn parse_certificate(cert_der: &[u8]) -> Result<CertificateDetails, String> {
-    // Parse with x509-parser
     let (_, cert) = X509Certificate::from_der(cert_der)
         .map_err(|e| format!("Failed to parse certificate: {}", e))?;
 
-    // Basic certificate information
     let subject = cert.subject().to_string();
     let issuer = cert.issuer().to_string();
     let serial_number = hex::encode(&cert.serial.to_bytes_be());
     let version = cert.version.0 as u32;
 
-    // Validity period
     let not_before = cert.validity().not_before.to_string();
     let not_after = cert.validity().not_after.to_string();
-    
+
     let now = chrono::Utc::now().timestamp();
     let expiry_timestamp = cert.validity().not_after.timestamp();
     let is_expired = now > expiry_timestamp;
     let days_until_expiry = (expiry_timestamp - now) / 86400;
 
-    // Signature algorithm
     let signature_algorithm = format!("{}", cert.signature_algorithm.algorithm);
 
-    // Public key information
     let public_key_algorithm = format!("{}", cert.public_key().algorithm.algorithm);
     let public_key_size = match cert.public_key().algorithm.algorithm.to_string().as_str() {
-        "1.2.840.113549.1.1.1" => { // RSA
-            // Estimate RSA key size from the public key data length
-            // This is a rough approximation
+        "1.2.840.113549.1.1.1" => {
             let key_data_len = cert.public_key().subject_public_key.data.len();
-            if key_data_len > 500 { Some(4096) }
-            else if key_data_len > 300 { Some(2048) }
-            else if key_data_len > 200 { Some(1024) }
-            else { Some(512) }
-        },
-        "1.2.840.10045.2.1" => { // ECDSA
-            // Estimate ECDSA key size from the public key data length
+            if key_data_len > 500 {
+                Some(4096)
+            } else if key_data_len > 300 {
+                Some(2048)
+            } else if key_data_len > 200 {
+                Some(1024)
+            } else {
+                Some(512)
+            }
+        }
+        "1.2.840.10045.2.1" => {
             let key_data_len = cert.public_key().subject_public_key.data.len();
-            if key_data_len > 120 { Some(521) }
-            else if key_data_len > 80 { Some(384) }
-            else { Some(256) }
-        },
+            if key_data_len > 120 {
+                Some(521)
+            } else if key_data_len > 80 {
+                Some(384)
+            } else {
+                Some(256)
+            }
+        }
         _ => None,
     };
 
-    // Calculate fingerprints
     let fingerprint_sha1 = hex::encode(sha1::Sha1::digest(cert_der)).to_uppercase();
     let fingerprint_sha256 = hex::encode(sha2::Sha256::digest(cert_der)).to_uppercase();
     let fingerprint_md5 = hex::encode(md5::compute(cert_der).0).to_uppercase();
 
-    // Parse extensions
     let mut subject_alt_names = Vec::new();
     let mut key_usage = Vec::new();
     let mut extended_key_usage = Vec::new();
@@ -218,26 +219,47 @@ fn parse_certificate(cert_der: &[u8]) -> Result<CertificateDetails, String> {
                 for name in &san.general_names {
                     match name {
                         GeneralName::DNSName(dns) => subject_alt_names.push(format!("DNS:{}", dns)),
-                        GeneralName::IPAddress(ip) => subject_alt_names.push(format!("IP:{}", hex::encode(ip))),
+                        GeneralName::IPAddress(ip) => {
+                            subject_alt_names.push(format!("IP:{}", hex::encode(ip)))
+                        }
                         GeneralName::URI(uri) => subject_alt_names.push(format!("URI:{}", uri)),
-                        GeneralName::RFC822Name(email) => subject_alt_names.push(format!("Email:{}", email)),
+                        GeneralName::RFC822Name(email) => {
+                            subject_alt_names.push(format!("Email:{}", email))
+                        }
                         _ => {}
                     }
                 }
-            },
+            }
             ParsedExtension::KeyUsage(ku) => {
-                if ku.digital_signature() { key_usage.push("Digital Signature".to_string()); }
-                if ku.non_repudiation() { key_usage.push("Non Repudiation".to_string()); }
-                if ku.key_encipherment() { key_usage.push("Key Encipherment".to_string()); }
-                if ku.data_encipherment() { key_usage.push("Data Encipherment".to_string()); }
-                if ku.key_agreement() { key_usage.push("Key Agreement".to_string()); }
-                if ku.key_cert_sign() { key_usage.push("Certificate Sign".to_string()); }
-                if ku.crl_sign() { key_usage.push("CRL Sign".to_string()); }
-                if ku.encipher_only() { key_usage.push("Encipher Only".to_string()); }
-                if ku.decipher_only() { key_usage.push("Decipher Only".to_string()); }
-            },
+                if ku.digital_signature() {
+                    key_usage.push("Digital Signature".to_string());
+                }
+                if ku.non_repudiation() {
+                    key_usage.push("Non Repudiation".to_string());
+                }
+                if ku.key_encipherment() {
+                    key_usage.push("Key Encipherment".to_string());
+                }
+                if ku.data_encipherment() {
+                    key_usage.push("Data Encipherment".to_string());
+                }
+                if ku.key_agreement() {
+                    key_usage.push("Key Agreement".to_string());
+                }
+                if ku.key_cert_sign() {
+                    key_usage.push("Certificate Sign".to_string());
+                }
+                if ku.crl_sign() {
+                    key_usage.push("CRL Sign".to_string());
+                }
+                if ku.encipher_only() {
+                    key_usage.push("Encipher Only".to_string());
+                }
+                if ku.decipher_only() {
+                    key_usage.push("Decipher Only".to_string());
+                }
+            }
             ParsedExtension::ExtendedKeyUsage(eku) => {
-                // ExtendedKeyUsage contains individual purpose OIDs
                 if eku.server_auth {
                     extended_key_usage.push("TLS Web Server Authentication".to_string());
                 }
@@ -256,18 +278,21 @@ fn parse_certificate(cert_der: &[u8]) -> Result<CertificateDetails, String> {
                 if eku.ocsp_signing {
                     extended_key_usage.push("OCSP Signing".to_string());
                 }
-            },
+            }
             ParsedExtension::BasicConstraints(bc) => {
-                basic_constraints = Some(format!("CA: {}, Path Length: {:?}", bc.ca, bc.path_len_constraint));
-            },
+                basic_constraints = Some(format!(
+                    "CA: {}, Path Length: {:?}",
+                    bc.ca, bc.path_len_constraint
+                ));
+            }
             ParsedExtension::AuthorityKeyIdentifier(aki) => {
                 if let Some(key_id) = &aki.key_identifier {
                     authority_key_identifier = Some(hex::encode(key_id.0).to_uppercase());
                 }
-            },
+            }
             ParsedExtension::SubjectKeyIdentifier(ski) => {
                 subject_key_identifier = Some(hex::encode(ski.0).to_uppercase());
-            },
+            }
             ParsedExtension::CRLDistributionPoints(cdp) => {
                 for point in &cdp.points {
                     if let Some(name) = &point.distribution_point {
@@ -280,30 +305,30 @@ fn parse_certificate(cert_der: &[u8]) -> Result<CertificateDetails, String> {
                         }
                     }
                 }
-            },
+            }
             ParsedExtension::AuthorityInfoAccess(aia) => {
                 for access in &aia.accessdescs {
                     match access.access_location {
                         GeneralName::URI(ref uri) => {
                             let method_oid = access.access_method.to_string();
-                            if method_oid == "1.3.6.1.5.5.7.48.1" { // OCSP
+                            if method_oid == "1.3.6.1.5.5.7.48.1" {
                                 ocsp_servers.push(uri.to_string());
-                            } else if method_oid == "1.3.6.1.5.5.7.48.2" { // CA Issuers
+                            } else if method_oid == "1.3.6.1.5.5.7.48.2" {
                                 ca_issuers.push(uri.to_string());
                             }
-                        },
+                        }
                         _ => {}
                     }
                 }
-            },
+            }
             _ => {}
         }
     }
 
-    // Create PEM certificate
     let pem_certificate = format!(
         "-----BEGIN CERTIFICATE-----\n{}\n-----END CERTIFICATE-----",
-        general_purpose::STANDARD.encode(cert_der)
+        general_purpose::STANDARD
+            .encode(cert_der)
             .chars()
             .collect::<Vec<char>>()
             .chunks(64)
@@ -312,7 +337,6 @@ fn parse_certificate(cert_der: &[u8]) -> Result<CertificateDetails, String> {
             .join("\n")
     );
 
-    // DER certificate as base64
     let der_certificate = general_purpose::STANDARD.encode(cert_der);
 
     Ok(CertificateDetails {
@@ -345,22 +369,24 @@ fn parse_certificate(cert_der: &[u8]) -> Result<CertificateDetails, String> {
 }
 
 #[tauri::command]
-async fn download_certificate(hostname: String, port: Option<u16>, format: String) -> Result<String, String> {
+async fn download_certificate(
+    hostname: String,
+    port: Option<u16>,
+    format: String,
+) -> Result<String, String> {
     let cert_info = get_tls_certificate_info(hostname.clone(), port).await?;
-    
+
     if cert_info.certificates.is_empty() {
         return Err("No certificates found".to_string());
     }
 
     let leaf_cert = &cert_info.certificates[0];
-    
+
     match format.as_str() {
         "pem" => Ok(leaf_cert.pem_certificate.clone()),
         "der" => Ok(leaf_cert.der_certificate.clone()),
-        "json" => {
-            serde_json::to_string_pretty(&cert_info)
-                .map_err(|e| format!("Failed to serialize certificate info: {}", e))
-        },
+        "json" => serde_json::to_string_pretty(&cert_info)
+            .map_err(|e| format!("Failed to serialize certificate info: {}", e)),
         _ => Err("Invalid format. Supported formats: pem, der, json".to_string()),
     }
 }
@@ -378,8 +404,8 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
-            greet, 
-            get_tls_certificate_info, 
+            greet,
+            get_tls_certificate_info,
             download_certificate,
             get_app_version
         ])
