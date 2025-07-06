@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.1] - 2025-07-06
+
+### FIX
+
+* Fix base64 to hex converter
+
 ## [1.4.0] - 2025-06-28
 
 ### Added

@@ -74,8 +74,8 @@ import BasePanel from './BasePanel.vue';
 import ComponentViewer from './ComponentViewer.vue';
 
 const input = ref('');
-const inputFormat = ref('text');
-const outputFormat = ref('base64');
+const inputFormat = ref('base64');
+const outputFormat = ref('text');
 const result = ref('');
 const error = ref('');
 const hexCase = ref('lower');
@@ -86,7 +86,7 @@ const inputPlaceholder = computed(() => {
     case 'text':
       return 'Enter the text to convert...';
     case 'hex':
-      return 'Enter the hexadecimal string to convert...';
+      return 'Enter hexadecimal string (with or without separators like :, -, or spaces)...';
     case 'base64':
       return 'Enter the Base64 string to convert...';
     default:
@@ -139,10 +139,13 @@ function convert() {
 }
 
 function hexToBytes(hex: string): Uint8Array {
-  hex = hex.replace(/\s/g, '');
+  // Remove common separators: spaces, colons, dashes, and any whitespace
+  hex = hex.replace(/[\s:.-]/g, '');
+  
   if (hex.length % 2 !== 0) {
     throw new Error('Hexadecimal string must have an even length');
   }
+  
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
     const byte = parseInt(hex.substr(i, 2), 16);
