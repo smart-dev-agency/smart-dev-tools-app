@@ -1,6 +1,6 @@
 [package]
 name = "smart-dev-tools"
-version = "1.4.1"
+version = "1.5.0"
 description = "A collection of useful tools for developers"
 repository = "https://github.com/smart-dev-agency/smart-dev-tools-app"
 authors = ["Smart Dev Agency"]

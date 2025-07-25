@@ -1,15 +1,15 @@
 <template>
-  <ComponentViewer title="JWT Decode">
+  <ComponentViewer title="JWT/Token Decoder">
     <BaseCard>
       <section class="col-5 h-100 p-3">
         <div class="d-flex flex-column h-100">
-          <BaseInput v-model="jwt" placeholder="Paste your JWT here..." multiline :rows="16" class="jwt-input flex-grow-1" />
+          <BaseInput v-model="jwt" placeholder="Paste your JWT or Base64-encoded token here..." multiline :rows="16" class="jwt-input flex-grow-1" />
           <div class="button-group mt-3">
             <BaseButton @click="decode" :disabled="!jwt.trim()">Decode</BaseButton>
             <BaseButton @click="clear" variant="secondary">Clear</BaseButton>
           </div>
           <div v-if="error" class="error mt-2">{{ error }}</div>
-          <div v-if="jwt.trim() && !error && header && payload" class="success mt-2">✅ JWT decoded successfully</div>
+          <div v-if="jwt.trim() && !error && header && payload" class="success mt-2">✅ Token decoded successfully</div>
         </div>
       </section>
 
@@ -17,16 +17,16 @@
         <BasePanel title="Header" class="mb-3" :content="header">
           <pre v-if="header">{{ header }}</pre>
           <div v-else class="placeholder-text">
-            The JWT header will be shown here<br />
-            <small>Contains information about the signing algorithm and token type</small>
+            The token header/metadata will be shown here<br />
+            <small>Contains information about the token type and format</small>
           </div>
         </BasePanel>
 
         <BasePanel title="Payload" class="mb-3" :content="payload">
           <pre v-if="payload">{{ payload }}</pre>
           <div v-else class="placeholder-text">
-            The JWT payload will be shown here<br />
-            <small>Contains the claims (data) of the token</small>
+            The token payload/content will be shown here<br />
+            <small>Contains the main data of the token</small>
           </div>
         </BasePanel>
 
@@ -110,6 +110,37 @@ function extractTokenInfo(payloadObj: any): any {
   return Object.keys(info).length > 0 ? info : null;
 }
 
+function extractTokenInfoFromData(data: any): any {
+  const info: any = {};
+
+  if (data.serverCertificates && Array.isArray(data.serverCertificates)) {
+    info.type = "Server Certificate Bundle";
+    info.certificateCount = data.serverCertificates.length;
+
+    if (data.version) {
+      info.version = data.version;
+    }
+
+    if (data.serverCertificates.length > 0) {
+      info.firstCertificatePreview = data.serverCertificates[0].substring(0, 50) + "...";
+    }
+  }
+
+  if (data.exp) {
+    const now = Math.floor(Date.now() / 1000);
+    info.isExpired = data.exp < now;
+    info.timeToExpiry = getTimeToExpiry(data.exp);
+  }
+
+  if (data.iss) info.issuer = data.iss;
+  if (data.sub) info.subject = data.sub;
+  if (data.aud) {
+    info.audience = Array.isArray(data.aud) ? data.aud.join(", ") : data.aud;
+  }
+
+  return Object.keys(info).length > 0 ? info : null;
+}
+
 function base64UrlDecode(str: string): string {
   let base64 = str.replace(/-/g, "+").replace(/_/g, "/");
 
@@ -164,10 +195,30 @@ function decode() {
 
   const cleanJwt = jwt.value.trim().replace(/\s+/g, "");
 
+  if (!cleanJwt.includes(".")) {
+    try {
+      const decoded = base64UrlDecode(cleanJwt);
+      const parsedData = validateAndParseJSON(decoded);
+
+      payload.value = JSON.stringify(parsedData, null, 2);
+      header.value = JSON.stringify(
+        {
+          note: "This appears to be a Base64-encoded JSON object, not a standard JWT",
+          type: "Base64 JSON",
+        },
+        null,
+        2
+      );
+
+      tokenInfo.value = extractTokenInfoFromData(parsedData);
+      return;
+    } catch (e) {}
+  }
+
   const parts = cleanJwt.split(".");
 
   if (parts.length !== 3) {
-    error.value = `Invalid JWT. Expected 3 parts separated by '.', but found ${parts.length}.`;
+    error.value = `Invalid JWT format. Expected either a Base64-encoded JSON or a JWT with 3 parts separated by '.', but found ${parts.length} parts.`;
     return;
   }
 
@@ -198,13 +249,13 @@ function decode() {
     tokenInfo.value = extractTokenInfo(payloadObj);
   } catch (e: any) {
     if (e.message.includes("Invalid Base64")) {
-      error.value = "Decoding error: The JWT contains invalid Base64 characters.";
+      error.value = "Decoding error: The token contains invalid Base64 characters.";
     } else if (e.message.includes("Invalid JSON")) {
       error.value = "Decoding error: The decoded content is not valid JSON.";
     } else {
-      error.value = `Error decoding the JWT: ${e.message || "Unknown error"}`;
+      error.value = `Error decoding the token: ${e.message || "Unknown error"}`;
     }
-    console.error("JWT Decode Error:", e);
+    console.error("Token Decode Error:", e);
   }
 }
 </script>

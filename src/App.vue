@@ -53,6 +53,7 @@
 
 <script setup lang="ts">
 import Base64Converter from "@/shared/componentes/Base64Converter.vue";
+import CertificateAnalyzer from "@/shared/componentes/CertificateAnalyzer.vue";
 import DateConverter from "@/shared/componentes/DateConverter.vue";
 import FileHasher from "@/shared/componentes/FileHasher.vue";
 import Home from "@/shared/componentes/Home.vue";
@@ -60,6 +61,7 @@ import JwtDecode from "@/shared/componentes/JwtDecode.vue";
 import MarkdownEditor from "@/shared/componentes/MarkdownEditor.vue";
 import QrCodeTool from "@/shared/componentes/QrCodeTool.vue";
 import RegexTester from "@/shared/componentes/RegexTester.vue";
+import RSAKeyAnalyzer from "@/shared/componentes/RSAKeyAnalyzer.vue";
 import StringHasher from "@/shared/componentes/StringHasher.vue";
 import TextAnalyzer from "@/shared/componentes/TextAnalyzer.vue";
 import TextDiff from "@/shared/componentes/TextDiff.vue";
@@ -77,6 +79,8 @@ const componentMap = {
   "file-hasher": FileHasher,
   "string-hasher": StringHasher,
   "tls-certificate-checker": TlsCertificateChecker,
+  "certificate-analyzer": CertificateAnalyzer,
+  "rsa-key-analyzer": RSAKeyAnalyzer,
   "qr-code-tool": QrCodeTool,
   "markdown-editor": MarkdownEditor,
   "regex-tester": RegexTester,
@@ -97,7 +101,11 @@ const categories = [
   },
   {
     name: "Security Tools",
-    items: [{ key: "tls-certificate-checker", label: "TLS Certificate Checker" }],
+    items: [
+      { key: "tls-certificate-checker", label: "TLS Certificate Checker" },
+      { key: "certificate-analyzer", label: "Certificate Analyzer" },
+      { key: "rsa-key-analyzer", label: "RSA Key Analyzer" },
+    ],
   },
   {
     name: "Text Tools",

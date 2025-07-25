@@ -1,5 +1,58 @@
 # Changelog
 
+## [1.5.0] - 2025-07-25
+
+### Added
+
+- **Certificate Analyzer**: New security tool for analyzing X.509 certificates
+  - Real certificate parsing using node-forge library
+  - Support for PEM and DER formats
+  - Comprehensive certificate information display (subject, issuer, validity, etc.)
+  - Security assessment and validation status
+  - Cryptographic details (signature algorithm, public key info)
+  - Fingerprint generation (SHA-256, SHA-1, MD5)
+  - Extension parsing (Key Usage, Subject Alt Names, Basic Constraints, etc.)
+  - Export functionality (copy, download, JSON export)
+  - Dark mode support
+
+- **RSA Key Analyzer**: New security tool for analyzing RSA keys
+  - Support for both private and public RSA keys
+  - PEM format parsing and validation
+  - Key component extraction (modulus, exponents, primes)
+  - Security level assessment based on key size
+  - NIST compliance checking
+  - Public key extraction from private keys
+  - Key fingerprint generation
+  - Security recommendations based on key properties
+  - Export functionality and dark mode support
+
+### Improved
+
+- **JWT/Token Decoder**: Enhanced to support multiple token formats
+  - Automatic format detection (standard JWT vs Base64-encoded JSON)
+  - Support for Base64-encoded JSON tokens (like server certificate bundles)
+  - Improved error handling and user feedback
+  - Better token type identification
+  - Enhanced payload analysis for different token structures
+
+- **Security Tools Category**: Expanded with comprehensive certificate and key analysis tools
+  - TLS Certificate Checker (existing)
+  - Certificate Analyzer (new)
+  - RSA Key Analyzer (new)
+
+- **Certificate Extensions Parsing**: Advanced parsing for complex certificate extensions
+  - Authority Information Access with URL extraction
+  - Certificate Policies with OID mapping
+  - CRL Distribution Points
+  - Subject and Authority Key Identifiers
+  - Improved handling of binary extension data
+
+### Technical Improvements
+
+- **Dependencies**: Added node-forge library for robust cryptographic operations
+- **TypeScript**: Enhanced type definitions for better development experience
+- **Error Handling**: Improved error messages and validation across security tools
+
 ## [1.4.1] - 2025-07-06
 
 ### FIX
