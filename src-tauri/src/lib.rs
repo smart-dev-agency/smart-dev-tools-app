@@ -392,6 +392,23 @@ async fn download_certificate(
 }
 
 #[tauri::command]
+async fn analyze_certificate_pem(certificate_pem: String) -> Result<CertificateDetails, String> {
+    // Remove PEM headers and decode base64
+    let pem_data = certificate_pem
+        .replace("-----BEGIN CERTIFICATE-----", "")
+        .replace("-----END CERTIFICATE-----", "")
+        .replace("\n", "")
+        .replace("\r", "")
+        .replace(" ", "");
+    
+    let cert_der = general_purpose::STANDARD
+        .decode(pem_data)
+        .map_err(|e| format!("Failed to decode base64: {}", e))?;
+    
+    parse_certificate(&cert_der)
+}
+
+#[tauri::command]
 async fn get_app_version() -> Result<String, String> {
     Ok(env!("CARGO_PKG_VERSION").to_string())
 }
@@ -407,6 +424,7 @@ pub fn run() {
             greet,
             get_tls_certificate_info,
             download_certificate,
+            analyze_certificate_pem,
             get_app_version
         ])
         .run(tauri::generate_context!())
