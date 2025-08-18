@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.6.0] - 2025-08-17
+
+### Updated
+
+- **Application Icons**: Regenerated all application icons from updated source
+  - Regenerated macOS app icons (icon.icns) 
+  - Updated Windows app icons (icon.ico)
+  - Refreshed PNG icons for all platforms (32x32, 64x64, 128x128, 256x256, 512x512, 1024x1024)
+  - Updated Windows Store logos (Square30x30, Square44x44, Square71x71, etc.)
+  - Refreshed Android adaptive icons (all mipmap densities)
+  - Updated iOS app icons (all required sizes and scales)
+  - Ensured consistent branding across all platforms
+
 ## [1.5.0] - 2025-07-25
 
 ### Added

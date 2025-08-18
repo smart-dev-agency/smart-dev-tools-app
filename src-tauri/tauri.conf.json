@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Smart Dev Tools",
-  "version": "1.5.1",
-  "identifier": "com.smartdev.smartdevtools",
+  "productName": "Smart Dev Tools OSS",
+  "version": "1.6.0",
+  "identifier": "com.smartdev.smartdevtools.oss",
   "build": {
     "beforeDevCommand": "yarn dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Smart Dev Tools",
+        "title": "Smart Dev Tools OSS",
         "width": 1280,
         "height": 720,
         "resizable": false

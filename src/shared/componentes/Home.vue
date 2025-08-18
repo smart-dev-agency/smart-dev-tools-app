@@ -1,10 +1,10 @@
 <template>
-  <ComponentViewer title="Smart Dev Tools">
+  <ComponentViewer title="Smart Dev Tools OSS">
     <BaseCard>
       <section class="col-12 p-4">
         <div class="welcome-section">
           <div class="welcome-header">
-            <h2>🛠️ Welcome to Smart Dev Tools</h2>
+            <h2>🛠️ Welcome to Smart Dev Tools OSS</h2>
             <p class="welcome-subtitle">
               A comprehensive suite of development tools built with <strong>Tauri</strong>, <strong>Vue 3</strong>, and <strong>TypeScript</strong>
             </p>
@@ -12,7 +12,7 @@
 
           <div class="intro-description">
             <p>
-              Smart Dev Tools is a native desktop application that provides developers with essential utilities for daily development tasks. All tools
+              Smart Dev Tools OSS is a native desktop application that provides developers with essential utilities for daily development tasks. All tools
               run locally on your device, ensuring privacy and performance.
             </p>
             <p>Explore the sidebar to discover various categories of tools designed to streamline your development workflow.</p>
@@ -100,7 +100,7 @@
         </BasePanel>
 
         <div class="footer-section mt-4">
-          <p class="footer-text"><strong>Smart Dev Tools</strong> - Developed with ❤️ using modern technologies for modern developers.</p>
+          <p class="footer-text"><strong>Smart Dev Tools OSS</strong> - Developed with ❤️ using modern technologies for modern developers.</p>
           <p class="footer-version">Native compilation • Total privacy • Open source</p>
         </div>
       </section>
