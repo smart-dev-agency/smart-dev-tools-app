@@ -22,7 +22,7 @@ Since this app is not signed or notarized by Apple, you'll need to bypass Gateke
 
 ```bash
 # Remove quarantine from the app after installation
-sudo xattr -rd com.apple.quarantine /Applications/Smart\ Dev\ Tools.app
+sudo xattr -rd com.apple.quarantine /Applications/Smart\ Dev\ Tools\ OSS.app
 
 # Or remove quarantine from the DMG file
 sudo xattr -rd com.apple.quarantine /path/to/downloaded.dmg

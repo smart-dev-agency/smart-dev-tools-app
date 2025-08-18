@@ -350,7 +350,7 @@ jobs:
           ## ⚠️ macOS Installation Note
           If you see \"Smart Dev Tools is damaged\", run:
           \`\`\`bash
-          sudo xattr -rd com.apple.quarantine /Applications/Smart\ Dev\ Tools.app
+          sudo xattr -rd com.apple.quarantine /Applications/Smart\ Dev\ Tools\ OSS.app
           \`\`\`
 
           ---
