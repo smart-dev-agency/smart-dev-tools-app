@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.6.2] - 2025-08-19
+
+### Fixed
+
+- Build fixes for macOS and Tauri
+- Version synchronization in package.json and tauri.conf.json
+- Minor improvements in icon generation and cleanup of temporary files
+
+### Updated
+
+- Regenerated icons using square source for multiplatform compatibility
+- Documentation and changelog updated to reflect recent changes
+
 ## [1.6.0] - 2025-08-17
 
 ### Updated
