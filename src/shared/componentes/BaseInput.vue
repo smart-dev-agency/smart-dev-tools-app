@@ -1,63 +1,35 @@
 <template>
   <textarea
     v-if="multiline"
-    class="base-input"
     v-bind="$attrs"
+    class="base-input"
+    :aria-label="
+      ($attrs['aria-label'] as string) || ($attrs.placeholder as string)
+    "
     :value="modelValue"
     :rows="rows"
-    @input="(e) => $emit('update:modelValue', (e.target as HTMLTextAreaElement).value)"
+    spellcheck="false"
+    @input="update"
   ></textarea>
   <input
     v-else
-    class="base-input"
     v-bind="$attrs"
+    class="base-input"
+    :aria-label="
+      ($attrs['aria-label'] as string) || ($attrs.placeholder as string)
+    "
     :value="modelValue"
-    @input="(e) => $emit('update:modelValue', (e.target as HTMLInputElement).value)"
+    spellcheck="false"
+    @input="update"
   />
 </template>
-
 <script setup lang="ts">
-defineProps({
-  modelValue: String,
-  multiline: {
-    type: Boolean,
-    default: false
-  },
-  rows: {
-    type: Number,
-    default: 3
-  }
-});
+defineOptions({ inheritAttrs: false });
+withDefaults(
+  defineProps<{ modelValue?: string; multiline?: boolean; rows?: number }>(),
+  { rows: 5 },
+);
+const emit = defineEmits<{ "update:modelValue": [value: string] }>();
+const update = (event: Event) =>
+  emit("update:modelValue", (event.target as HTMLInputElement).value);
 </script>
-
-<style scoped lang="scss">
-.base-input {
-  width: 100%;
-  border-radius: 8px;
-  border: 1px solid var(--input-border);
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-family: inherit;
-  color: var(--input-color);
-  background-color: var(--input-bg);
-  transition: all 0.2s ease;
-  box-shadow: var(--input-shadow);
-  outline: none;
-  resize: vertical;
-  min-height: 2.5em;
-  
-  &:focus {
-    border-color: var(--button-bg);
-    box-shadow: var(--input-focus-shadow);
-  }
-
-  &::placeholder {
-    color: var(--placeholder-color);
-  }
-}
-
-textarea.base-input {
-  min-height: 6em;
-  line-height: 1.5;
-}
-</style>

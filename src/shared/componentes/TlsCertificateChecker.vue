@@ -4,41 +4,92 @@
       <section class="col-12 p-3">
         <BasePanel title="Server Details" class="mb-3">
           <div class="input-row">
-            <BaseInput v-model="hostname" placeholder="Enter hostname (e.g., google.com)" class="hostname-input" />
-            <BaseInput v-model="port" placeholder="443" type="number" class="port-input" />
+            <BaseInput
+              v-model="hostname"
+              placeholder="Enter hostname (e.g., google.com)"
+              class="hostname-input"
+            />
+            <BaseInput
+              v-model="port"
+              aria-label="Server port"
+              placeholder="443"
+              type="number"
+              min="1"
+              max="65535"
+              class="port-input"
+            />
           </div>
 
           <div class="button-group mt-3">
-            <BaseButton @click="checkCertificate" :disabled="!hostname.trim() || isLoading">
+            <BaseButton
+              @click="checkCertificate"
+              :disabled="!hostname.trim() || isLoading"
+            >
               {{ isLoading ? "Checking..." : "Check Certificate" }}
             </BaseButton>
             <BaseButton @click="clear" variant="secondary">Clear</BaseButton>
           </div>
 
-          <div v-if="error" class="error mt-2">{{ error }}</div>
-          <div v-if="certificateInfo && !error" class="success mt-2">✅ Certificate information retrieved successfully</div>
+          <p class="hint">
+            Connects to the server you specify. DNS, connection and TLS each
+            have a 10-second timeout. Uses system and bundled CA roots; this is
+            not a revocation check.
+          </p>
+          <div v-if="error" role="alert" class="error mt-2">{{ error }}</div>
+          <div v-if="certificateInfo && !error" class="success mt-2">
+            ✅ Certificate information retrieved successfully
+          </div>
         </BasePanel>
 
         <div v-if="certificateInfo" class="certificate-container">
           <BasePanel title="Connection Information" class="cert-panel mb-3">
             <div class="cert-info">
-              <div class="info-item"><strong>Hostname:</strong> {{ certificateInfo.hostname }}</div>
-              <div class="info-item"><strong>Port:</strong> {{ certificateInfo.port }}</div>
-              <div class="info-item"><strong>TLS Version:</strong> {{ certificateInfo.tls_version }}</div>
-              <div class="info-item"><strong>Cipher Suite:</strong> {{ certificateInfo.cipher_suite }}</div>
-              <div class="info-item"><strong>Chain Length:</strong> {{ certificateInfo.chain_length }} certificate(s)</div>
+              <div class="info-item">
+                <strong>Hostname:</strong> {{ certificateInfo.hostname }}
+              </div>
+              <div class="info-item">
+                <strong>Port:</strong> {{ certificateInfo.port }}
+              </div>
+              <div class="info-item">
+                <strong>TLS Version:</strong> {{ certificateInfo.tls_version }}
+              </div>
+              <div class="info-item">
+                <strong>Cipher Suite:</strong>
+                {{ certificateInfo.cipher_suite }}
+              </div>
+              <div class="info-item">
+                <strong>Chain Length:</strong>
+                {{ certificateInfo.chain_length }} certificate(s)
+              </div>
               <div class="info-item">
                 <strong>Root CA Trusted:</strong>
-                <span :class="{ 'cert-valid': certificateInfo.root_ca_trusted, 'cert-invalid': !certificateInfo.root_ca_trusted }">
+                <span
+                  :class="{
+                    'cert-valid': certificateInfo.root_ca_trusted,
+                    'cert-invalid': !certificateInfo.root_ca_trusted,
+                  }"
+                >
                   {{ certificateInfo.root_ca_trusted ? "✅ Yes" : "❌ No" }}
                 </span>
               </div>
             </div>
           </BasePanel>
 
-          <div v-if="certificateInfo.certificates && certificateInfo.certificates.length > 0">
-            <div v-for="(cert, index) in certificateInfo.certificates" :key="index" class="mb-3">
-              <BasePanel :title="`${index === 0 ? 'Leaf Certificate' : `Intermediate Certificate ${index}`}`" class="cert-panel">
+          <div
+            v-if="
+              certificateInfo.certificates &&
+              certificateInfo.certificates.length > 0
+            "
+          >
+            <div
+              v-for="(cert, index) in certificateInfo.certificates"
+              :key="index"
+              class="mb-3"
+            >
+              <BasePanel
+                :title="`${index === 0 ? 'Leaf Certificate' : `Intermediate Certificate ${index}`}`"
+                class="cert-panel"
+              >
                 <div class="cert-tabs">
                   <div class="tab-buttons">
                     <button
@@ -46,111 +97,210 @@
                       :key="tab.id"
                       @click="activeTab[index] = tab.id"
                       :class="{ active: activeTab[index] === tab.id }"
+                      :aria-pressed="activeTab[index] === tab.id"
                       class="tab-button"
                     >
                       {{ tab.label }}
                     </button>
                   </div>
 
-                  <div v-show="activeTab[index] === 'basic'" class="tab-content">
+                  <div
+                    v-show="activeTab[index] === 'basic'"
+                    class="tab-content"
+                  >
                     <div class="cert-info">
                       <div class="info-item">
-                        <strong>Subject:</strong> <code class="cert-dn">{{ cert.subject }}</code>
+                        <strong>Subject:</strong>
+                        <code class="cert-dn">{{ cert.subject }}</code>
                       </div>
                       <div class="info-item">
-                        <strong>Issuer:</strong> <code class="cert-dn">{{ cert.issuer }}</code>
+                        <strong>Issuer:</strong>
+                        <code class="cert-dn">{{ cert.issuer }}</code>
                       </div>
                       <div class="info-item">
-                        <strong>Serial Number:</strong> <code class="serial">{{ cert.serial_number }}</code>
+                        <strong>Serial Number:</strong>
+                        <code class="serial">{{ cert.serial_number }}</code>
                       </div>
-                      <div class="info-item"><strong>Version:</strong> {{ cert.version }}</div>
-                      <div class="info-item"><strong>Valid From:</strong> {{ cert.not_before }}</div>
-                      <div class="info-item"><strong>Valid To:</strong> {{ cert.not_after }}</div>
+                      <div class="info-item">
+                        <strong>Version:</strong> {{ cert.version }}
+                      </div>
+                      <div class="info-item">
+                        <strong>Valid From:</strong> {{ cert.not_before }}
+                      </div>
+                      <div class="info-item">
+                        <strong>Valid To:</strong> {{ cert.not_after }}
+                      </div>
                       <div class="info-item">
                         <strong>Status:</strong>
-                        <span :class="{ 'cert-valid': !cert.is_expired, 'cert-invalid': cert.is_expired }">
-                          {{ cert.is_expired ? "❌ Expired" : "✅ Valid" }}
+                        <span
+                          :class="{
+                            'cert-valid': !cert.is_expired,
+                            'cert-invalid': cert.is_expired,
+                          }"
+                        >
+                          {{ cert.is_expired ? "❌ Expired" : "Not expired" }}
                         </span>
                       </div>
                       <div class="info-item">
                         <strong>Days Until Expiry:</strong>
-                        <span :class="{ 'cert-warning': cert.days_until_expiry < 30, 'cert-invalid': cert.days_until_expiry < 0 }">
+                        <span
+                          :class="{
+                            'cert-warning': cert.days_until_expiry < 30,
+                            'cert-invalid': cert.days_until_expiry < 0,
+                          }"
+                        >
                           {{ cert.days_until_expiry }}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  <div v-show="activeTab[index] === 'security'" class="tab-content">
+                  <div
+                    v-show="activeTab[index] === 'security'"
+                    class="tab-content"
+                  >
                     <div class="cert-info">
-                      <div class="info-item"><strong>Signature Algorithm:</strong> {{ cert.signature_algorithm }}</div>
-                      <div class="info-item"><strong>Public Key Algorithm:</strong> {{ cert.public_key_algorithm }}</div>
-                      <div v-if="cert.public_key_size" class="info-item"><strong>Public Key Size:</strong> {{ cert.public_key_size }} bits</div>
+                      <div class="info-item">
+                        <strong>Signature Algorithm:</strong>
+                        {{ cert.signature_algorithm }}
+                      </div>
+                      <div class="info-item">
+                        <strong>Public Key Algorithm:</strong>
+                        {{ cert.public_key_algorithm }}
+                      </div>
+                      <div v-if="cert.public_key_size" class="info-item">
+                        <strong>Public Key Size:</strong>
+                        {{ cert.public_key_size }} bits
+                      </div>
                       <div class="info-item">
                         <strong>SHA1 Fingerprint:</strong>
-                        <code class="fingerprint">{{ formatFingerprint(cert.fingerprint_sha1) }}</code>
+                        <code class="fingerprint">{{
+                          formatFingerprint(cert.fingerprint_sha1)
+                        }}</code>
                       </div>
                       <div class="info-item">
                         <strong>SHA256 Fingerprint:</strong>
-                        <code class="fingerprint">{{ formatFingerprint(cert.fingerprint_sha256) }}</code>
+                        <code class="fingerprint">{{
+                          formatFingerprint(cert.fingerprint_sha256)
+                        }}</code>
                       </div>
                       <div class="info-item">
                         <strong>MD5 Fingerprint:</strong>
-                        <code class="fingerprint">{{ formatFingerprint(cert.fingerprint_md5) }}</code>
+                        <code class="fingerprint">{{
+                          formatFingerprint(cert.fingerprint_md5)
+                        }}</code>
                       </div>
                       <div v-if="cert.subject_key_identifier" class="info-item">
                         <strong>Subject Key ID:</strong>
-                        <code class="fingerprint">{{ formatFingerprint(cert.subject_key_identifier) }}</code>
+                        <code class="fingerprint">{{
+                          formatFingerprint(cert.subject_key_identifier)
+                        }}</code>
                       </div>
-                      <div v-if="cert.authority_key_identifier" class="info-item">
+                      <div
+                        v-if="cert.authority_key_identifier"
+                        class="info-item"
+                      >
                         <strong>Authority Key ID:</strong>
-                        <code class="fingerprint">{{ formatFingerprint(cert.authority_key_identifier) }}</code>
+                        <code class="fingerprint">{{
+                          formatFingerprint(cert.authority_key_identifier)
+                        }}</code>
                       </div>
                     </div>
                   </div>
 
-                  <div v-show="activeTab[index] === 'extensions'" class="tab-content">
+                  <div
+                    v-show="activeTab[index] === 'extensions'"
+                    class="tab-content"
+                  >
                     <div class="cert-info">
-                      <div v-if="cert.subject_alt_names && cert.subject_alt_names.length > 0" class="info-item">
+                      <div
+                        v-if="
+                          cert.subject_alt_names &&
+                          cert.subject_alt_names.length > 0
+                        "
+                        class="info-item"
+                      >
                         <strong>Subject Alternative Names:</strong>
                         <ul class="san-list">
-                          <li v-for="san in cert.subject_alt_names" :key="san">{{ san }}</li>
-                        </ul>
-                      </div>
-                      <div v-if="cert.key_usage && cert.key_usage.length > 0" class="info-item">
-                        <strong>Key Usage:</strong>
-                        <ul class="usage-list">
-                          <li v-for="usage in cert.key_usage" :key="usage">{{ usage }}</li>
-                        </ul>
-                      </div>
-                      <div v-if="cert.extended_key_usage && cert.extended_key_usage.length > 0" class="info-item">
-                        <strong>Extended Key Usage:</strong>
-                        <ul class="usage-list">
-                          <li v-for="usage in cert.extended_key_usage" :key="usage">{{ usage }}</li>
-                        </ul>
-                      </div>
-                      <div v-if="cert.basic_constraints" class="info-item"><strong>Basic Constraints:</strong> {{ cert.basic_constraints }}</div>
-                      <div v-if="cert.crl_distribution_points && cert.crl_distribution_points.length > 0" class="info-item">
-                        <strong>CRL Distribution Points:</strong>
-                        <ul class="url-list">
-                          <li v-for="url in cert.crl_distribution_points" :key="url">
-                            <a :href="url" target="_blank">{{ url }}</a>
+                          <li v-for="san in cert.subject_alt_names" :key="san">
+                            {{ san }}
                           </li>
                         </ul>
                       </div>
-                      <div v-if="cert.ocsp_servers && cert.ocsp_servers.length > 0" class="info-item">
+                      <div
+                        v-if="cert.key_usage && cert.key_usage.length > 0"
+                        class="info-item"
+                      >
+                        <strong>Key Usage:</strong>
+                        <ul class="usage-list">
+                          <li v-for="usage in cert.key_usage" :key="usage">
+                            {{ usage }}
+                          </li>
+                        </ul>
+                      </div>
+                      <div
+                        v-if="
+                          cert.extended_key_usage &&
+                          cert.extended_key_usage.length > 0
+                        "
+                        class="info-item"
+                      >
+                        <strong>Extended Key Usage:</strong>
+                        <ul class="usage-list">
+                          <li
+                            v-for="usage in cert.extended_key_usage"
+                            :key="usage"
+                          >
+                            {{ usage }}
+                          </li>
+                        </ul>
+                      </div>
+                      <div v-if="cert.basic_constraints" class="info-item">
+                        <strong>Basic Constraints:</strong>
+                        {{ cert.basic_constraints }}
+                      </div>
+                      <div
+                        v-if="
+                          cert.crl_distribution_points &&
+                          cert.crl_distribution_points.length > 0
+                        "
+                        class="info-item"
+                      >
+                        <strong>CRL Distribution Points:</strong>
+                        <ul class="url-list">
+                          <li
+                            v-for="url in cert.crl_distribution_points"
+                            :key="url"
+                          >
+                            <button class="link-button" @click="openLink(url)">
+                              {{ url }}
+                            </button>
+                          </li>
+                        </ul>
+                      </div>
+                      <div
+                        v-if="cert.ocsp_servers && cert.ocsp_servers.length > 0"
+                        class="info-item"
+                      >
                         <strong>OCSP Servers:</strong>
                         <ul class="url-list">
                           <li v-for="url in cert.ocsp_servers" :key="url">
-                            <a :href="url" target="_blank">{{ url }}</a>
+                            <button class="link-button" @click="openLink(url)">
+                              {{ url }}
+                            </button>
                           </li>
                         </ul>
                       </div>
-                      <div v-if="cert.ca_issuers && cert.ca_issuers.length > 0" class="info-item">
+                      <div
+                        v-if="cert.ca_issuers && cert.ca_issuers.length > 0"
+                        class="info-item"
+                      >
                         <strong>CA Issuers:</strong>
                         <ul class="url-list">
                           <li v-for="url in cert.ca_issuers" :key="url">
-                            <a :href="url" target="_blank">{{ url }}</a>
+                            <button class="link-button" @click="openLink(url)">
+                              {{ url }}
+                            </button>
                           </li>
                         </ul>
                       </div>
@@ -161,19 +311,43 @@
                     <div class="cert-raw">
                       <div class="raw-section">
                         <strong>PEM Format:</strong>
-                        <textarea readonly class="cert-textarea">{{ cert.pem_certificate }}</textarea>
+                        <textarea
+                          readonly
+                          aria-label="PEM certificate"
+                          class="cert-textarea"
+                          >{{ cert.pem_certificate }}</textarea
+                        >
                         <div class="cert-actions mt-3">
                           <BaseButton
-                            @click="copyCertificate(cert.pem_certificate, index)"
+                            @click="
+                              copyCertificate(cert.pem_certificate, index)
+                            "
                             variant="secondary"
-                            :class="['action-btn', { 'copy-success': copySuccess[index] }]"
+                            :class="[
+                              'action-btn',
+                              { 'copy-success': copySuccess[index] },
+                            ]"
                           >
-                            {{ copySuccess[index] ? "✅ Copied!" : "📋 Copy PEM" }}
+                            {{
+                              copySuccess[index] ? "✅ Copied!" : "📋 Copy PEM"
+                            }}
                           </BaseButton>
-                          <BaseButton @click="downloadSingleCertificate(cert, 'pem', index)" variant="secondary" class="action-btn">
+                          <BaseButton
+                            @click="
+                              downloadSingleCertificate(cert, 'pem', index)
+                            "
+                            variant="secondary"
+                            class="action-btn"
+                          >
                             📥 Download PEM
                           </BaseButton>
-                          <BaseButton @click="downloadSingleCertificate(cert, 'der', index)" variant="secondary" class="action-btn">
+                          <BaseButton
+                            @click="
+                              downloadSingleCertificate(cert, 'der', index)
+                            "
+                            variant="secondary"
+                            class="action-btn"
+                          >
                             📥 Download DER
                           </BaseButton>
                         </div>
@@ -188,23 +362,35 @@
           <BasePanel title="Download Complete Chain" class="mt-3">
             <div class="download-section">
               <div class="download-buttons">
-                <BaseButton @click="downloadCertificate('json')" variant="secondary" class="download-btn">
+                <BaseButton
+                  @click="downloadCertificate('json')"
+                  variant="secondary"
+                  class="download-btn"
+                >
                   📥 Download Complete Chain (JSON)
                 </BaseButton>
               </div>
               <p class="download-info mt-2">
-                Downloads the complete certificate chain information including all certificates, connection details, and validation results.
+                Downloads the complete certificate chain information including
+                all certificates, connection details, and validation results.
               </p>
             </div>
           </BasePanel>
 
           <BasePanel
-            v-if="certificateInfo.chain_validation_errors && certificateInfo.chain_validation_errors.length > 0"
+            v-if="
+              certificateInfo.chain_validation_errors &&
+              certificateInfo.chain_validation_errors.length > 0
+            "
             title="Validation Errors"
             class="mt-3 error-panel"
           >
             <ul class="error-list">
-              <li v-for="error in certificateInfo.chain_validation_errors" :key="error" class="error-item">
+              <li
+                v-for="error in certificateInfo.chain_validation_errors"
+                :key="error"
+                class="error-item"
+              >
                 {{ error }}
               </li>
             </ul>
@@ -216,10 +402,10 @@
 </template>
 
 <script setup lang="ts">
-import { invoke } from "@tauri-apps/api/core";
-import { save } from "@tauri-apps/plugin-dialog";
-import { writeFile } from "@tauri-apps/plugin-fs";
-import { reactive, ref } from "vue";
+import { invoke, isTauri } from "@tauri-apps/api/core";
+import { copyText, openExternal, saveText, saveBytes } from "../lib/output";
+import { decodeBytes } from "../lib/binary";
+import { reactive, ref, watch, onBeforeUnmount } from "vue";
 import BaseButton from "./BaseButton.vue";
 import BaseCard from "./BaseCard.vue";
 import BaseInput from "./BaseInput.vue";
@@ -266,6 +452,7 @@ interface CertificateChainInfo {
   chain_validation_errors: string[];
 }
 
+let requestId = 0;
 const hostname = ref("");
 const port = ref("443");
 const error = ref("");
@@ -282,16 +469,38 @@ const tabs = [
 
 const activeTab = reactive<Record<number, string>>({});
 
+watch(
+  [hostname, port],
+  () => {
+    requestId++;
+    certificateInfo.value = null;
+    error.value = "";
+    isLoading.value = false;
+  },
+  { flush: "sync" },
+);
+onBeforeUnmount(() => requestId++);
+async function openLink(url: string) {
+  try {
+    await openExternal(url);
+  } catch (e) {
+    error.value = String(e);
+  }
+}
+
 function clear() {
   hostname.value = "";
   port.value = "443";
   error.value = "";
   certificateInfo.value = null;
   Object.keys(activeTab).forEach((key) => delete activeTab[parseInt(key)]);
-  Object.keys(copySuccess.value).forEach((key) => delete copySuccess.value[parseInt(key)]);
+  Object.keys(copySuccess.value).forEach(
+    (key) => delete copySuccess.value[parseInt(key)],
+  );
 }
 
 async function checkCertificate() {
+  const id = ++requestId;
   error.value = "";
   certificateInfo.value = null;
   isLoading.value = true;
@@ -303,13 +512,26 @@ async function checkCertificate() {
   }
 
   try {
-    const portNum = parseInt(port.value) || 443;
+    const portNum = Number(port.value);
+    if (
+      !/^\d+$/.test(port.value) ||
+      !Number.isInteger(portNum) ||
+      portNum < 1 ||
+      portNum > 65535
+    )
+      throw new Error("Port must be an integer between 1 and 65535.");
+    if (!isTauri())
+      throw new Error("TLS connections are available in the desktop app.");
 
-    const result = await invoke<CertificateChainInfo>("get_tls_certificate_info", {
-      hostname: hostname.value.trim(),
-      port: portNum,
-    });
+    const result = await invoke<CertificateChainInfo>(
+      "get_tls_certificate_info",
+      {
+        hostname: hostname.value.trim(),
+        port: portNum,
+      },
+    );
 
+    if (id !== requestId) return;
     certificateInfo.value = result;
 
     if (result.certificates) {
@@ -318,9 +540,10 @@ async function checkCertificate() {
       });
     }
   } catch (e: any) {
-    error.value = `Error checking certificate: ${e || "Unknown error"}`;
+    if (id === requestId)
+      error.value = `Error checking certificate: ${e || "Unknown error"}`;
   } finally {
-    isLoading.value = false;
+    if (id === requestId) isLoading.value = false;
   }
 }
 
@@ -331,7 +554,7 @@ function formatFingerprint(fingerprint?: string): string {
 
 async function copyCertificate(pemData: string, certIndex: number) {
   try {
-    await navigator.clipboard.writeText(pemData);
+    await copyText(pemData);
     copySuccess.value[certIndex] = true;
 
     setTimeout(() => {
@@ -342,85 +565,33 @@ async function copyCertificate(pemData: string, certIndex: number) {
   }
 }
 
-async function downloadSingleCertificate(cert: CertificateDetails, format: "pem" | "der", certIndex: number) {
-  if (!certificateInfo.value) return;
-
+async function downloadSingleCertificate(
+  cert: CertificateDetails,
+  format: "pem" | "der",
+  index: number,
+) {
+  const snapshot = certificateInfo.value;
+  if (!snapshot) return;
   try {
-    let data: Uint8Array;
-    let extension: string;
-    let filename: string;
-
-    const certType = certIndex === 0 ? "leaf" : `intermediate-${certIndex}`;
-
-    if (format === "der") {
-      try {
-        const binaryString = atob(cert.der_certificate);
-        data = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          data[i] = binaryString.charCodeAt(i);
-        }
-        extension = "der";
-      } catch (decodeError) {
-        error.value = "Error decoding certificate data";
-        return;
-      }
-    } else {
-      const encoder = new TextEncoder();
-      data = encoder.encode(cert.pem_certificate);
-      extension = "crt";
-    }
-
-    filename = `${certificateInfo.value.hostname}-${certType}-certificate.${extension}`;
-
-    await downloadWithTauri(data, filename);
-  } catch (e: any) {
-    error.value = `Error downloading certificate: ${e?.message || "Unknown error"}`;
+    const filename = `${snapshot.hostname}-${index === 0 ? "leaf" : `intermediate-${index}`}.${format}`;
+    if (format === "der")
+      await saveBytes(decodeBytes(cert.der_certificate, "base64"), filename);
+    else await saveText(cert.pem_certificate, filename);
+  } catch (e) {
+    error.value = `Could not export certificate: ${e}`;
   }
 }
-
-async function downloadCertificate(format: "json") {
-  if (!certificateInfo.value) return;
-
+async function downloadCertificate(_format: "json") {
+  const snapshot = certificateInfo.value;
+  if (!snapshot) return;
   try {
-    const result = await invoke<string>("download_certificate", {
-      hostname: certificateInfo.value.hostname,
-      port: certificateInfo.value.port,
-      format: format,
-    });
-
-    const encoder = new TextEncoder();
-    const data = encoder.encode(result);
-    const filename = `${certificateInfo.value.hostname}-certificate-chain.json`;
-
-    await downloadWithTauri(data, filename);
-  } catch (e: any) {
-    error.value = `Error downloading certificate chain: ${e?.message || "Unknown error"}`;
-  }
-}
-
-async function downloadWithTauri(data: Uint8Array, filename: string) {
-  try {
-    const filePath = await save({
-      defaultPath: filename,
-      filters: [
-        {
-          name: "Certificate Files",
-          extensions: ["crt", "pem", "der", "json"],
-        },
-        {
-          name: "All Files",
-          extensions: ["*"],
-        },
-      ],
-    });
-
-    if (!filePath) {
-      return;
-    }
-
-    await writeFile(filePath, data);
-  } catch (error) {
-    throw new Error(`Download failed: ${error}`);
+    await saveText(
+      JSON.stringify(snapshot, null, 2),
+      `${snapshot.hostname}-certificate-chain.json`,
+      "application/json",
+    );
+  } catch (e) {
+    error.value = `Could not export certificate chain: ${e}`;
   }
 }
 </script>

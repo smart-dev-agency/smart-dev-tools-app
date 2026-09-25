@@ -1,545 +1,372 @@
 <template>
-  <ComponentViewer title="Markdown Editor">
-    <BaseCard>
-      <div class="markdown-editor-content">
-        <div class="format-toolbar">
-          <div class="format-group">
-            <button class="format-btn" title="Bold" @click="insertFormat('**', '**')">
-              <strong>B</strong>
-            </button>
-            <button class="format-btn" title="Italic" @click="insertFormat('*', '*')">
-              <em>I</em>
-            </button>
-            <button class="format-btn" title="Strikethrough" @click="insertFormat('~~', '~~')">
-              <span style="text-decoration: line-through">S</span>
-            </button>
-          </div>
-          <div class="format-group">
-            <button class="format-btn" title="Heading 1" @click="insertHeading(1)">H1</button>
-            <button class="format-btn" title="Heading 2" @click="insertHeading(2)">H2</button>
-            <button class="format-btn" title="Heading 3" @click="insertHeading(3)">H3</button>
-          </div>
-          <div class="format-group">
-            <button class="format-btn" title="Bulleted list" @click="insertList('- ')">•</button>
-            <button class="format-btn" title="Numbered list" @click="insertList('1. ')">1.</button>
-            <button class="format-btn" title="Quote" @click="insertFormat('> ', '')">""</button>
-          </div>
-          <div class="format-group">
-            <button class="format-btn" title="Inline code" @click="insertFormat('`', '`')">
-              <code>{ }</code>
-            </button>
-            <button class="format-btn" title="Code block" @click="insertCodeBlock()">
-              <code>```</code>
-            </button>
-            <button class="format-btn" title="Link" @click="insertLink()">🔗</button>
-            <button class="format-btn" title="Image" @click="insertImage()">🖼️</button>
-          </div>
-        </div>
-        <div class="editor-layout">
-          <div class="editor-pane">
-            <BasePanel title="Editor">
-              <div class="editor-container" ref="editorContainer"></div>
-            </BasePanel>
-          </div>
-
-          <div class="preview-pane">
-            <BasePanel title="Preview">
-              <div class="preview-container" v-html="htmlContent"></div>
-            </BasePanel>
-          </div>
-        </div>
-
-        <div class="toolbar">
-          <BaseButton @click="downloadMarkdown">Download Markdown</BaseButton>
-          <BaseButton @click="downloadHTML">Download HTML</BaseButton>
-          <BaseButton @click="copyMarkdown" title="Copy Markdown">Copy MD</BaseButton>
-          <BaseButton @click="copyHTML" title="Copy HTML">Copy HTML</BaseButton>
-        </div>
+  <ComponentViewer title="Markdown Editor"
+    ><div class="stack">
+      <div class="format-toolbar" aria-label="Markdown formatting">
+        <button
+          v-for="action in formats"
+          :key="action.label"
+          class="quiet-button"
+          :title="action.label"
+          :aria-label="action.label"
+          @click="insert(action.prefix, action.suffix)"
+        >
+          {{ action.text }}</button
+        ><span class="toolbar-divider"></span
+        ><button
+          v-for="level in [1, 2, 3]"
+          :key="level"
+          class="quiet-button"
+          :aria-label="`Heading ${level}`"
+          @click="heading(level)"
+        >
+          H{{ level }}</button
+        ><button class="quiet-button" @click="prefixLines('- ')">List</button
+        ><button class="quiet-button" @click="prefixLines('1. ')">
+          1. List</button
+        ><button class="quiet-button" @click="prefixLines('> ')">Quote</button>
       </div>
-    </BaseCard>
-  </ComponentViewer>
+      <div class="workbench markdown-panes">
+        <BasePanel title="Markdown source"
+          ><div ref="editorContainer" class="editor-container"></div></BasePanel
+        ><BasePanel title="Preview"
+          ><template #actions
+            ><span v-if="busy" class="tag" role="status">Rendering…</span
+            ><button
+              v-if="large"
+              class="quiet-button"
+              @click="renderPreview"
+              :disabled="busy"
+            >
+              Render preview
+            </button></template
+          >
+          <p v-if="large && !rawHtml" class="notice">
+            Live preview pauses above 200,000 characters. Render explicitly to
+            keep typing responsive.
+          </p>
+          <div class="markdown-preview" v-html="html" @click="followLink"></div>
+          <p v-if="error" class="error" role="alert">{{ error }}</p></BasePanel
+        >
+      </div>
+      <div class="controls">
+        <BaseButton variant="secondary" @click="downloadMarkdown"
+          >Export Markdown</BaseButton
+        ><BaseButton
+          variant="secondary"
+          @click="downloadHtml"
+          :disabled="rawHtml === null"
+          >Export HTML</BaseButton
+        ><BaseButton variant="secondary" @click="copyMarkdown"
+          >Copy Markdown</BaseButton
+        ><BaseButton
+          variant="secondary"
+          @click="copyHtml"
+          :disabled="rawHtml === null"
+          >Copy HTML</BaseButton
+        ><span class="hint" role="status">{{ status }}</span>
+      </div>
+      <p v-if="actionError" class="error" role="alert">{{ actionError }}</p>
+      <p class="hint">
+        Sanitized local preview. Embedded images and media are omitted to
+        prevent background network requests; image syntax is preserved in
+        Markdown. Links open only when clicked.
+      </p>
+    </div></ComponentViewer
+  >
 </template>
-
 <script setup lang="ts">
-import DOMPurify from "dompurify";
-import { marked } from "marked";
-import * as monaco from "monaco-editor";
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { basicSetup, EditorView } from "codemirror";
+import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { tags } from "@lezer/highlight";
+import { markdown } from "@codemirror/lang-markdown";
+import { sanitizePreview } from "../lib/preview";
+import {
+  computed,
+  onActivated,
+  onBeforeUnmount,
+  onDeactivated,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
+import { useWorker } from "../lib/useWorker";
+import { copyText, openExternal, saveText } from "../lib/output";
 import BaseButton from "./BaseButton.vue";
-import BaseCard from "./BaseCard.vue";
 import BasePanel from "./BasePanel.vue";
 import ComponentViewer from "./ComponentViewer.vue";
-
-const editorContainer = ref<HTMLElement | null>(null);
-const htmlContent = ref("");
-const copied = ref(false);
-let editor: monaco.editor.IStandaloneCodeEditor | null = null;
-
-function insertFormat(prefix: string, suffix: string) {
-  if (!editor) return;
-
-  const selection = editor.getSelection();
-  if (!selection) return;
-
-  const selectedText = editor.getModel()?.getValueInRange(selection) || "";
-  const range = new monaco.Range(selection.startLineNumber, selection.startColumn, selection.endLineNumber, selection.endColumn);
-
-  const newText = `${prefix}${selectedText}${suffix}`;
-  editor.executeEdits("format", [
-    {
-      range: range,
-      text: newText,
-      forceMoveMarkers: true,
-    },
-  ]);
-  editor.focus();
+const content = ref(
+  '# A fresh page\n\nWrite something useful.\n\n- Format your notes\n- Preview as you type\n- Export when you are ready\n\n```ts\nconst message = "Hello, developer";\n```\n',
+);
+const editorContainer = ref<HTMLElement>(),
+  actionError = ref(""),
+  status = ref("");
+let editor: EditorView | undefined, timer: ReturnType<typeof setTimeout>;
+const {
+  result: rawHtml,
+  busy,
+  error,
+  run,
+  reset,
+  cancel,
+} = useWorker<string>();
+const large = computed(() => content.value.length > 200000);
+const html = computed(() => sanitizePreview(rawHtml.value ?? ""));
+const formats = [
+  { label: "Bold", text: "B", prefix: "**", suffix: "**" },
+  { label: "Italic", text: "I", prefix: "*", suffix: "*" },
+  { label: "Strikethrough", text: "S̶", prefix: "~~", suffix: "~~" },
+  { label: "Inline code", text: "<>", prefix: "`", suffix: "`" },
+  { label: "Code block", text: "Code", prefix: "```\n", suffix: "\n```" },
+  { label: "Link", text: "Link", prefix: "[", suffix: "](url)" },
+  { label: "Image", text: "Image", prefix: "![", suffix: "](url)" },
+];
+function mountEditor() {
+  if (editor || !editorContainer.value) return;
+  editor = new EditorView({
+    parent: editorContainer.value,
+    doc: content.value,
+    extensions: [
+      basicSetup,
+      markdown(),
+      syntaxHighlighting(
+        HighlightStyle.define([
+          { tag: tags.heading, color: "var(--accent)", fontWeight: "600" },
+          {
+            tag: [tags.string, tags.attributeValue],
+            color: "var(--syntax-string)",
+          },
+          { tag: [tags.keyword, tags.tagName], color: "var(--syntax-keyword)" },
+          { tag: [tags.comment, tags.meta], color: "var(--muted)" },
+          {
+            tag: tags.link,
+            color: "var(--accent)",
+            textDecoration: "underline",
+          },
+          { tag: tags.strong, fontWeight: "700" },
+          { tag: tags.emphasis, fontStyle: "italic" },
+          { tag: tags.strikethrough, textDecoration: "line-through" },
+          { tag: tags.monospace, fontFamily: "var(--mono)" },
+        ]),
+      ),
+      EditorView.lineWrapping,
+      EditorView.contentAttributes.of({
+        "aria-label": "Markdown source",
+        spellcheck: "false",
+      }),
+      EditorView.theme({
+        "&": {
+          backgroundColor: "var(--surface)",
+          color: "var(--text)",
+          fontSize: "13px",
+        },
+        ".cm-content": {
+          fontFamily: "var(--mono)",
+          caretColor: "var(--accent)",
+          minHeight: "360px",
+        },
+        ".cm-scroller": { lineHeight: "1.7" },
+        ".cm-gutters": {
+          backgroundColor: "var(--surface)",
+          color: "var(--muted)",
+          borderRight: "1px solid var(--border)",
+        },
+        ".cm-activeLine, .cm-activeLineGutter": {
+          backgroundColor: "var(--surface-alt)",
+        },
+        ".cm-cursor": { borderLeftColor: "var(--text)" },
+        "&.cm-focused .cm-selectionBackground, .cm-selectionBackground": {
+          backgroundColor: "var(--accent-soft)",
+        },
+      }),
+      EditorView.updateListener.of((update) => {
+        if (update.docChanged) content.value = update.state.doc.toString();
+      }),
+    ],
+  });
+  if (rawHtml.value === null && !large.value) renderPreview();
 }
-
-function insertHeading(level: number) {
-  if (!editor) return;
-
-  const selection = editor.getSelection();
-  if (!selection) return;
-
-  const model = editor.getModel();
-  if (!model) return;
-
-  const lineContent = model.getLineContent(selection.startLineNumber);
-  const prefix = "#".repeat(level) + " ";
-
-  const cleanLine = lineContent.replace(/^#+\s*/, "");
-
-  editor.executeEdits("heading", [
-    {
-      range: new monaco.Range(selection.startLineNumber, 1, selection.startLineNumber, lineContent.length + 1),
-      text: prefix + cleanLine,
-      forceMoveMarkers: true,
-    },
-  ]);
-  editor.focus();
+function destroyEditor() {
+  editor?.destroy();
+  editor = undefined;
+  clearTimeout(timer);
+  cancel();
 }
-
-function insertList(prefix: string) {
-  if (!editor) return;
-
-  const selection = editor.getSelection();
-  if (!selection) return;
-
-  const model = editor.getModel();
-  if (!model) return;
-
-  const lines = [];
-  for (let i = selection.startLineNumber; i <= selection.endLineNumber; i++) {
-    const lineContent = model.getLineContent(i).trim();
-    if (lineContent) {
-      lines.push(prefix + lineContent);
-    }
-  }
-
-  editor.executeEdits("list", [
-    {
-      range: new monaco.Range(selection.startLineNumber, 1, selection.endLineNumber, model.getLineMaxColumn(selection.endLineNumber)),
-      text: lines.join("\n"),
-      forceMoveMarkers: true,
-    },
-  ]);
-  editor.focus();
-}
-
-function insertCodeBlock() {
-  if (!editor) return;
-
-  const selection = editor.getSelection();
-  if (!selection) return;
-
-  const selectedText = editor.getModel()?.getValueInRange(selection) || "";
-  const newText = `\`\`\`\n${selectedText}\n\`\`\``;
-
-  editor.executeEdits("codeblock", [
-    {
-      range: selection,
-      text: newText,
-      forceMoveMarkers: true,
-    },
-  ]);
-  editor.focus();
-}
-
-function insertLink() {
-  if (!editor) return;
-
-  const selection = editor.getSelection();
-  if (!selection) return;
-
-  const selectedText = editor.getModel()?.getValueInRange(selection) || "";
-  const newText = `[${selectedText}](url)`;
-
-  editor.executeEdits("link", [
-    {
-      range: selection,
-      text: newText,
-      forceMoveMarkers: true,
-    },
-  ]);
-  editor.focus();
-}
-
-function insertImage() {
-  if (!editor) return;
-
-  const selection = editor.getSelection();
-  if (!selection) return;
-
-  const selectedText = editor.getModel()?.getValueInRange(selection) || "";
-  const newText = `![${selectedText}](url)`;
-
-  editor.executeEdits("image", [
-    {
-      range: selection,
-      text: newText,
-      forceMoveMarkers: true,
-    },
-  ]);
-  editor.focus();
-}
-
-marked.use({
-  gfm: true,
-  breaks: true,
-  async: false,
-  silent: true,
+onMounted(mountEditor);
+onActivated(mountEditor);
+onDeactivated(destroyEditor);
+onBeforeUnmount(destroyEditor);
+watch(content, () => {
+  clearTimeout(timer);
+  reset();
+  status.value = "";
+  if (!large.value) timer = setTimeout(renderPreview, 220);
 });
-
-onMounted(() => {
-  if (editorContainer.value) {
-    editor = monaco.editor.create(editorContainer.value, {
-      value: initialContent,
-      language: "markdown",
-      theme: "vs-dark",
-      minimap: { enabled: false },
-      wordWrap: "on",
-      lineNumbers: "on",
-      fontSize: 14,
-      automaticLayout: true,
-    });
-
-    editor.onDidChangeModelContent(() => {
-      updatePreview();
-    });
-
-    updatePreview();
-  }
-});
-
-onBeforeUnmount(() => {
-  if (editor) {
-    editor.dispose();
-  }
-});
-
-function updatePreview() {
+function renderPreview() {
+  clearTimeout(timer);
+  run({ kind: "markdown", text: content.value }, 10_000);
+}
+function insert(prefix: string, suffix: string) {
   if (!editor) return;
-
-  const markdownText = editor.getValue();
+  const { from, to } = editor.state.selection.main;
+  const text = editor.state.doc.sliceString(from, to);
+  editor.dispatch({
+    changes: { from, to, insert: prefix + text + suffix },
+    selection: {
+      anchor: from + prefix.length,
+      head: from + prefix.length + text.length,
+    },
+  });
+  editor.focus();
+}
+function heading(level: number) {
+  if (!editor) return;
+  const line = editor.state.doc.lineAt(editor.state.selection.main.from);
+  editor.dispatch({
+    changes: {
+      from: line.from,
+      to: line.to,
+      insert: "#".repeat(level) + " " + line.text.replace(/^#+\s*/, ""),
+    },
+  });
+  editor.focus();
+}
+function prefixLines(prefix: string) {
+  if (!editor) return;
+  const { from, to } = editor.state.selection.main,
+    first = editor.state.doc.lineAt(from),
+    last = editor.state.doc.lineAt(to);
+  editor.dispatch({
+    changes: {
+      from: first.from,
+      to: last.to,
+      insert: editor.state.doc
+        .sliceString(first.from, last.to)
+        .split("\n")
+        .map((line) => prefix + line)
+        .join("\n"),
+    },
+  });
+  editor.focus();
+}
+async function action(operation: () => Promise<void>, message = "") {
+  actionError.value = "";
+  status.value = "";
   try {
-    const parsedHtml = marked.parse(markdownText, { async: false }) as string;
-    htmlContent.value = DOMPurify.sanitize(parsedHtml);
-  } catch (error) {
-    console.error("Error processing Markdown:", error);
+    await operation();
+    status.value = message;
+  } catch (cause) {
+    actionError.value =
+      cause instanceof Error
+        ? cause.message
+        : "Could not complete this action.";
   }
 }
-
-function getMarkdownContent(): string {
-  return editor ? editor.getValue() : "";
-}
-
 function downloadMarkdown() {
-  downloadFile(getMarkdownContent(), "document.md", "text/markdown");
+  action(() => saveText(content.value, "document.md", "text/markdown"));
 }
-
-function downloadHTML() {
-  downloadFile(htmlContent.value, "document.html", "text/html");
+function downloadHtml() {
+  action(() =>
+    saveText(
+      `<!doctype html><html><head><meta charset="utf-8"><title>Markdown document</title></head><body>${html.value}</body></html>`,
+      "document.html",
+      "text/html",
+    ),
+  );
 }
-
-async function copyMarkdown() {
-  await copyToClipboard(getMarkdownContent());
+function copyMarkdown() {
+  action(() => copyText(content.value), "Markdown copied");
 }
-
-async function copyHTML() {
-  await copyToClipboard(htmlContent.value);
+function copyHtml() {
+  action(() => copyText(html.value), "HTML copied");
 }
-
-function downloadFile(content: string, filename: string, contentType: string) {
-  const blob = new Blob([content], { type: contentType });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
-async function copyToClipboard(text: string) {
-  try {
-    await navigator.clipboard.writeText(text);
-    copied.value = true;
-    setTimeout(() => {
-      copied.value = false;
-    }, 2000);
-  } catch (err) {
-    console.error("Error copying to clipboard:", err);
+function followLink(event: MouseEvent) {
+  const anchor = (event.target as Element).closest("a");
+  if (anchor) {
+    event.preventDefault();
+    action(() => openExternal(anchor.href));
   }
 }
-
-const initialContent = `# Markdown Editor
-
-## Features
-
-- Real-time preview
-- Syntax highlighting
-- Export to Markdown and HTML
-- Copy to clipboard
-
-## Code Example
-
-\`\`\`javascript
-function greet(name) {
-  console.log(\`Hello, \${name}!\`);
-}
-
-greet('Developer');
-\`\`\`
-
-## Example Table
-
-| Name | Description |
-|------|-------------|
-| VS Code | Code editor |
-| Markdown | Markup language |
-
-> This is an example of a quote.
-
----
-
-[Example link](https://example.com)
-
-![Example image](https://via.placeholder.com/150)
-`;
 </script>
-
-<style scoped lang="scss">
-.markdown-editor-content {
-  display: flex;
-  flex-direction: column;
-  padding: 1rem;
-  width: 100%;
-  height: 100%;
-  gap: 1rem;
-  overflow: hidden;
-}
-
+<style scoped>
 .format-toolbar {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  background: var(--panel-header-bg);
-  border-radius: 8px;
-  margin-bottom: 1rem;
-}
-
-.format-group {
-  display: flex;
-  gap: 0.25rem;
-  padding: 0.25rem;
-  border-right: 1px solid var(--input-border);
-
-  &:last-child {
-    border-right: none;
-  }
-}
-
-.format-btn {
-  display: flex;
   align-items: center;
-  justify-content: center;
-  min-width: 32px;
-  height: 32px;
-  padding: 0 0.5rem;
-  border: 1px solid var(--input-border);
-  background: var(--button-bg);
-  color: var(--button-color);
-  border-radius: 4px;
-  font-size: 0.9em;
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  &:hover {
-    background: var(--button-active-bg);
-    border-color: var(--button-border-hover);
-  }
-
-  &:active {
-    transform: translateY(1px);
-  }
-
-  code {
-    font-family: monospace;
-  }
-}
-
-.editor-layout {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  flex: 1;
-  overflow: hidden;
-
-  @media (min-width: 768px) {
-    flex-direction: row;
-  }
-}
-
-.editor-pane,
-.preview-pane {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  overflow: hidden;
-  min-height: 300px;
-}
-
-.editor-container {
-  width: 100%;
-  height: 100%;
-  min-height: 300px;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.preview-container {
-  width: 100%;
-  height: 100%;
-  padding: 1rem;
-  overflow: auto;
-  background-color: var(--panel-content-bg);
-  border-radius: 6px;
-  color: var(--text-primary);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  line-height: 1.6;
-
-  :deep(h1) {
-    font-size: 1.8rem;
-    margin-top: 0;
-    margin-bottom: 1rem;
-    padding-bottom: 0.3rem;
-    border-bottom: 1px solid var(--input-border);
-  }
-
-  :deep(h2) {
-    font-size: 1.5rem;
-    margin-top: 1.5rem;
-    margin-bottom: 1rem;
-    padding-bottom: 0.3rem;
-    border-bottom: 1px solid var(--input-border);
-  }
-
-  :deep(h3) {
-    font-size: 1.25rem;
-    margin-top: 1.2rem;
-    margin-bottom: 0.8rem;
-  }
-
-  :deep(h4) {
-    font-size: 1.1rem;
-    margin-top: 1rem;
-    margin-bottom: 0.6rem;
-  }
-
-  :deep(p) {
-    margin-top: 0;
-    margin-bottom: 1rem;
-  }
-
-  :deep(ul),
-  :deep(ol) {
-    margin-bottom: 1rem;
-    padding-left: 1.5rem;
-  }
-
-  :deep(li) {
-    margin-bottom: 0.25rem;
-  }
-
-  :deep(a) {
-    color: var(--button-bg);
-    text-decoration: none;
-
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-
-  :deep(pre) {
-    padding: 1rem;
-    background: var(--code-bg);
-    border-radius: 6px;
-    overflow-x: auto;
-    margin-bottom: 1rem;
-
-    code {
-      font-family: "Monaco", "Menlo", "Courier New", monospace;
-      font-size: 0.9rem;
-    }
-  }
-
-  :deep(blockquote) {
-    border-left: 4px solid var(--input-border);
-    padding-left: 1rem;
-    margin-left: 0;
-    color: var(--text-secondary);
-  }
-
-  :deep(hr) {
-    border: 0;
-    border-top: 1px solid var(--input-border);
-    margin: 1.5rem 0;
-  }
-
-  :deep(table) {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 1rem;
-
-    th,
-    td {
-      padding: 0.75rem;
-      border: 1px solid var(--input-border);
-    }
-
-    th {
-      background: var(--panel-header-bg);
-      text-align: left;
-    }
-
-    tr:nth-child(even) {
-      background: rgba(var(--panel-content-bg-rgb), 0.5);
-    }
-  }
-
-  :deep(img) {
-    max-width: 100%;
-    height: auto;
-    margin: 1rem 0;
-  }
-}
-
-.toolbar {
-  display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  justify-content: flex-start;
-  margin-top: auto;
-  padding-top: 1rem;
+  gap: 3px;
+  padding: 5px 0;
+}
+.format-toolbar button {
+  font-size: 11px;
+  padding: 5px 9px;
+  min-height: 29px;
+}
+.toolbar-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 5px;
+}
+.markdown-panes {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.editor-container {
+  min-height: 400px;
+}
+.editor-container :deep(.cm-editor) {
+  height: 480px;
+}
+.editor-container :deep(.cm-scroller) {
+  overflow: auto;
+}
+.markdown-panes :deep(.panel-content) {
+  padding: 0;
+}
+.markdown-preview {
+  padding: 20px;
+  min-height: 400px;
+  max-height: 65vh;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.markdown-preview :deep(h1) {
+  font-size: 26px;
+}
+.markdown-preview :deep(h2) {
+  font-size: 21px;
+}
+.markdown-preview :deep(h3) {
+  font-size: 17px;
+}
+.markdown-preview :deep(pre) {
+  padding: 14px;
+  background: var(--surface-alt);
+  border-radius: 6px;
+  margin: 14px 0;
+}
+.markdown-preview :deep(blockquote) {
+  border-left: 3px solid var(--accent);
+  margin: 16px 0;
+  padding-left: 14px;
+  color: var(--muted);
+}
+.markdown-preview :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+}
+.markdown-preview :deep(td),
+.markdown-preview :deep(th) {
+  border: 1px solid var(--border);
+  padding: 8px;
+  text-align: left;
+}
+.markdown-panes .error,
+.markdown-panes .notice {
+  margin: 12px;
+}
+@container workspace (max-width: 760px) {
+  .markdown-panes {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

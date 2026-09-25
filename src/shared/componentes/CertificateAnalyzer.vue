@@ -1,10 +1,12 @@
 <template>
-  <ComponentViewer title="Certificate Analyzer">
+  <ComponentViewer title="Certificate Inspector">
     <BaseCard>
       <section class="col-12 p-3">
         <BasePanel title="Certificate Input" class="mb-3">
           <div class="input-section">
-            <label for="certificate-input">Paste your certificate here (PEM format):</label>
+            <label for="certificate-input"
+              >Paste your certificate here (PEM format):</label
+            >
             <textarea
               id="certificate-input"
               v-model="certificateInput"
@@ -18,14 +20,25 @@ MIIDXTCCAkWgAwIBAgIJAKoK/OvD/XcwMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
           </div>
 
           <div class="button-group mt-3">
-            <BaseButton @click="analyzeCertificate" :disabled="!certificateInput.trim() || isLoading">
+            <BaseButton
+              @click="analyzeCertificate"
+              :disabled="!certificateInput.trim() || isLoading"
+            >
               {{ isLoading ? "Analyzing..." : "Analyze Certificate" }}
             </BaseButton>
-            <BaseButton @click="clearAnalysis" variant="secondary">Clear</BaseButton>
+            <BaseButton @click="clearAnalysis" variant="secondary"
+              >Clear</BaseButton
+            >
           </div>
 
-          <div v-if="error" class="error mt-2">{{ error }}</div>
-          <div v-if="certificateInfo && !error" class="success mt-2">✅ Certificate analyzed successfully</div>
+          <p class="hint">
+            Local parsing only. A successful parse does not verify the
+            signature, chain of trust, revocation or current validity period.
+          </p>
+          <div v-if="error" role="alert" class="error mt-2">{{ error }}</div>
+          <div v-if="certificateInfo && !error" class="success mt-2">
+            ✅ Certificate analyzed successfully
+          </div>
         </BasePanel>
 
         <div v-if="certificateInfo" class="certificate-container">
@@ -37,6 +50,7 @@ MIIDXTCCAkWgAwIBAgIJAKoK/OvD/XcwMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
                   :key="tab.id"
                   @click="activeTab = tab.id"
                   :class="{ active: activeTab === tab.id }"
+                  :aria-pressed="activeTab === tab.id"
                   class="tab-button"
                 >
                   {{ tab.label }}
@@ -46,35 +60,52 @@ MIIDXTCCAkWgAwIBAgIJAKoK/OvD/XcwMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
               <div v-show="activeTab === 'basic'" class="tab-content">
                 <div class="cert-info">
                   <div class="info-item">
-                    <strong>Subject:</strong> 
+                    <strong>Subject:</strong>
                     <code class="cert-dn">{{ certificateInfo.subject }}</code>
                   </div>
                   <div class="info-item">
-                    <strong>Issuer:</strong> 
+                    <strong>Issuer:</strong>
                     <code class="cert-dn">{{ certificateInfo.issuer }}</code>
                   </div>
                   <div class="info-item">
-                    <strong>Serial Number:</strong> 
-                    <code class="serial">{{ certificateInfo.serial_number }}</code>
+                    <strong>Serial Number:</strong>
+                    <code class="serial">{{
+                      certificateInfo.serial_number
+                    }}</code>
                   </div>
                   <div class="info-item">
                     <strong>Version:</strong> {{ certificateInfo.version }}
                   </div>
                   <div class="info-item">
-                    <strong>Valid From:</strong> {{ certificateInfo.not_before }}
+                    <strong>Valid From:</strong>
+                    {{ certificateInfo.not_before }}
                   </div>
                   <div class="info-item">
                     <strong>Valid To:</strong> {{ certificateInfo.not_after }}
                   </div>
                   <div class="info-item">
                     <strong>Status:</strong>
-                    <span :class="{ 'cert-valid': !certificateInfo.is_expired, 'cert-invalid': certificateInfo.is_expired }">
-                      {{ certificateInfo.is_expired ? "❌ Expired" : "✅ Valid" }}
+                    <span
+                      :class="{
+                        'cert-valid': !certificateInfo.is_expired,
+                        'cert-invalid': certificateInfo.is_expired,
+                      }"
+                    >
+                      {{
+                        certificateInfo.is_expired
+                          ? "❌ Expired"
+                          : "Not expired (trust not verified)"
+                      }}
                     </span>
                   </div>
                   <div class="info-item">
                     <strong>Days Until Expiry:</strong>
-                    <span :class="{ 'cert-warning': certificateInfo.days_until_expiry < 30, 'cert-invalid': certificateInfo.days_until_expiry < 0 }">
+                    <span
+                      :class="{
+                        'cert-warning': certificateInfo.days_until_expiry < 30,
+                        'cert-invalid': certificateInfo.days_until_expiry < 0,
+                      }"
+                    >
                       {{ certificateInfo.days_until_expiry }}
                     </span>
                   </div>
@@ -84,79 +115,154 @@ MIIDXTCCAkWgAwIBAgIJAKoK/OvD/XcwMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
               <div v-show="activeTab === 'security'" class="tab-content">
                 <div class="cert-info">
                   <div class="info-item">
-                    <strong>Signature Algorithm:</strong> {{ certificateInfo.signature_algorithm }}
+                    <strong>Signature Algorithm:</strong>
+                    {{ certificateInfo.signature_algorithm }}
                   </div>
                   <div class="info-item">
-                    <strong>Public Key Algorithm:</strong> {{ certificateInfo.public_key_algorithm }}
+                    <strong>Public Key Algorithm:</strong>
+                    {{ certificateInfo.public_key_algorithm }}
                   </div>
                   <div v-if="certificateInfo.public_key_size" class="info-item">
-                    <strong>Public Key Size:</strong> {{ certificateInfo.public_key_size }} bits
+                    <strong>Public Key Size:</strong>
+                    {{ certificateInfo.public_key_size }} bits
                   </div>
                   <div class="info-item">
                     <strong>SHA1 Fingerprint:</strong>
-                    <code class="fingerprint">{{ formatFingerprint(certificateInfo.fingerprint_sha1) }}</code>
+                    <code class="fingerprint">{{
+                      formatFingerprint(certificateInfo.fingerprint_sha1)
+                    }}</code>
                   </div>
                   <div class="info-item">
                     <strong>SHA256 Fingerprint:</strong>
-                    <code class="fingerprint">{{ formatFingerprint(certificateInfo.fingerprint_sha256) }}</code>
+                    <code class="fingerprint">{{
+                      formatFingerprint(certificateInfo.fingerprint_sha256)
+                    }}</code>
                   </div>
                   <div class="info-item">
                     <strong>MD5 Fingerprint:</strong>
-                    <code class="fingerprint">{{ formatFingerprint(certificateInfo.fingerprint_md5) }}</code>
+                    <code class="fingerprint">{{
+                      formatFingerprint(certificateInfo.fingerprint_md5)
+                    }}</code>
                   </div>
                 </div>
               </div>
 
               <div v-show="activeTab === 'extensions'" class="tab-content">
                 <div class="cert-info">
-                  <div v-if="certificateInfo.subject_alt_names && certificateInfo.subject_alt_names.length > 0" class="info-item">
+                  <div
+                    v-if="
+                      certificateInfo.subject_alt_names &&
+                      certificateInfo.subject_alt_names.length > 0
+                    "
+                    class="info-item"
+                  >
                     <strong>Subject Alternative Names:</strong>
                     <ul class="san-list">
-                      <li v-for="san in certificateInfo.subject_alt_names" :key="san">{{ san }}</li>
+                      <li
+                        v-for="san in certificateInfo.subject_alt_names"
+                        :key="san"
+                      >
+                        {{ san }}
+                      </li>
                     </ul>
                   </div>
-                  <div v-if="certificateInfo.key_usage && certificateInfo.key_usage.length > 0" class="info-item">
+                  <div
+                    v-if="
+                      certificateInfo.key_usage &&
+                      certificateInfo.key_usage.length > 0
+                    "
+                    class="info-item"
+                  >
                     <strong>Key Usage:</strong>
                     <ul class="usage-list">
-                      <li v-for="usage in certificateInfo.key_usage" :key="usage">{{ usage }}</li>
+                      <li
+                        v-for="usage in certificateInfo.key_usage"
+                        :key="usage"
+                      >
+                        {{ usage }}
+                      </li>
                     </ul>
                   </div>
-                  <div v-if="certificateInfo.extended_key_usage && certificateInfo.extended_key_usage.length > 0" class="info-item">
+                  <div
+                    v-if="
+                      certificateInfo.extended_key_usage &&
+                      certificateInfo.extended_key_usage.length > 0
+                    "
+                    class="info-item"
+                  >
                     <strong>Extended Key Usage:</strong>
                     <ul class="usage-list">
-                      <li v-for="usage in certificateInfo.extended_key_usage" :key="usage">{{ usage }}</li>
+                      <li
+                        v-for="usage in certificateInfo.extended_key_usage"
+                        :key="usage"
+                      >
+                        {{ usage }}
+                      </li>
                     </ul>
                   </div>
-                  <div v-if="certificateInfo.basic_constraints" class="info-item">
-                    <strong>Basic Constraints:</strong> {{ certificateInfo.basic_constraints }}
+                  <div
+                    v-if="certificateInfo.basic_constraints"
+                    class="info-item"
+                  >
+                    <strong>Basic Constraints:</strong>
+                    {{ certificateInfo.basic_constraints }}
                   </div>
-                  <div v-if="certificateInfo.crl_distribution_points && certificateInfo.crl_distribution_points.length > 0" class="info-item">
+                  <div
+                    v-if="
+                      certificateInfo.crl_distribution_points &&
+                      certificateInfo.crl_distribution_points.length > 0
+                    "
+                    class="info-item"
+                  >
                     <strong>CRL Distribution Points:</strong>
                     <ul class="url-list">
-                      <li v-for="url in certificateInfo.crl_distribution_points" :key="url">
-                        <a :href="url" target="_blank">{{ url }}</a>
+                      <li
+                        v-for="url in certificateInfo.crl_distribution_points"
+                        :key="url"
+                      >
+                        <button class="link-button" @click="openLink(url)">
+                          {{ url }}
+                        </button>
                       </li>
                     </ul>
                   </div>
-                  <div v-if="certificateInfo.ocsp_servers && certificateInfo.ocsp_servers.length > 0" class="info-item">
+                  <div
+                    v-if="
+                      certificateInfo.ocsp_servers &&
+                      certificateInfo.ocsp_servers.length > 0
+                    "
+                    class="info-item"
+                  >
                     <strong>OCSP Servers:</strong>
                     <ul class="url-list">
-                      <li v-for="url in certificateInfo.ocsp_servers" :key="url">
-                        <a :href="url" target="_blank">{{ url }}</a>
+                      <li
+                        v-for="url in certificateInfo.ocsp_servers"
+                        :key="url"
+                      >
+                        <button class="link-button" @click="openLink(url)">
+                          {{ url }}
+                        </button>
                       </li>
                     </ul>
                   </div>
-                  <div v-if="certificateInfo.ca_issuers && certificateInfo.ca_issuers.length > 0" class="info-item">
+                  <div
+                    v-if="
+                      certificateInfo.ca_issuers &&
+                      certificateInfo.ca_issuers.length > 0
+                    "
+                    class="info-item"
+                  >
                     <strong>CA Issuers:</strong>
                     <ul class="url-list">
                       <li v-for="url in certificateInfo.ca_issuers" :key="url">
-                        <a :href="url" target="_blank">{{ url }}</a>
+                        <button class="link-button" @click="openLink(url)">
+                          {{ url }}
+                        </button>
                       </li>
                     </ul>
                   </div>
                 </div>
               </div>
-
             </div>
           </BasePanel>
         </div>
@@ -166,85 +272,113 @@ MIIDXTCCAkWgAwIBAgIJAKoK/OvD/XcwMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
 </template>
 
 <script setup lang="ts">
-import { invoke } from '@tauri-apps/api/core'
-import { ref } from 'vue'
-import BaseButton from './BaseButton.vue'
-import BaseCard from './BaseCard.vue'
-import BasePanel from './BasePanel.vue'
-import ComponentViewer from './ComponentViewer.vue'
+import { invoke, isTauri } from "@tauri-apps/api/core";
+import { ref, watch, onBeforeUnmount } from "vue";
+import { openExternal } from "../lib/output";
+import BaseButton from "./BaseButton.vue";
+import BaseCard from "./BaseCard.vue";
+import BasePanel from "./BasePanel.vue";
+import ComponentViewer from "./ComponentViewer.vue";
 
 interface CertificateDetails {
-  subject: string
-  issuer: string
-  version: number
-  serial_number: string
-  not_before: string
-  not_after: string
-  is_expired: boolean
-  days_until_expiry: number
-  signature_algorithm: string
-  public_key_algorithm: string
-  public_key_size?: number
-  fingerprint_sha1: string
-  fingerprint_sha256: string
-  fingerprint_md5: string
-  subject_alt_names?: string[]
-  key_usage?: string[]
-  extended_key_usage?: string[]
-  basic_constraints?: string
-  crl_distribution_points?: string[]
-  ocsp_servers?: string[]
-  ca_issuers?: string[]
+  subject: string;
+  issuer: string;
+  version: number;
+  serial_number: string;
+  not_before: string;
+  not_after: string;
+  is_expired: boolean;
+  days_until_expiry: number;
+  signature_algorithm: string;
+  public_key_algorithm: string;
+  public_key_size?: number;
+  fingerprint_sha1: string;
+  fingerprint_sha256: string;
+  fingerprint_md5: string;
+  subject_alt_names?: string[];
+  key_usage?: string[];
+  extended_key_usage?: string[];
+  basic_constraints?: string;
+  crl_distribution_points?: string[];
+  ocsp_servers?: string[];
+  ca_issuers?: string[];
 }
 
+let requestId = 0;
 // Reactive state
-const certificateInput = ref('')
-const certificateInfo = ref<CertificateDetails | null>(null)
-const isLoading = ref(false)
-const error = ref<string | null>(null)
-const activeTab = ref('basic')
+const certificateInput = ref("");
+const certificateInfo = ref<CertificateDetails | null>(null);
+const isLoading = ref(false);
+const error = ref<string | null>(null);
+const activeTab = ref("basic");
+
+watch(
+  certificateInput,
+  () => {
+    requestId++;
+    certificateInfo.value = null;
+    error.value = null;
+    isLoading.value = false;
+  },
+  { flush: "sync" },
+);
+onBeforeUnmount(() => requestId++);
+async function openLink(url: string) {
+  try {
+    await openExternal(url);
+  } catch (e) {
+    error.value = String(e);
+  }
+}
 
 // Tabs configuration
 const tabs = [
-  { id: 'basic', label: 'Basic Info' },
-  { id: 'security', label: 'Security' },
-  { id: 'extensions', label: 'Extensions' }
-]
+  { id: "basic", label: "Basic Info" },
+  { id: "security", label: "Security" },
+  { id: "extensions", label: "Extensions" },
+];
 
 // Functions
 const analyzeCertificate = async () => {
   if (!certificateInput.value.trim()) {
-    error.value = 'Please enter a certificate'
-    return
+    error.value = "Please enter a certificate";
+    return;
   }
 
-  isLoading.value = true
-  error.value = null
-  certificateInfo.value = null
+  const id = ++requestId;
+  isLoading.value = true;
+  error.value = null;
+  certificateInfo.value = null;
 
   try {
-    const result = await invoke<CertificateDetails>('analyze_certificate_pem', {
-      certificatePem: certificateInput.value.trim()
-    })
-    
-    certificateInfo.value = result
+    if (!isTauri())
+      throw new Error(
+        "Certificate inspection is available in the desktop app.",
+      );
+    if (certificateInput.value.length > 1024 * 1024)
+      throw new Error("Certificate input exceeds 1 MiB.");
+    const result = await invoke<CertificateDetails>("analyze_certificate_pem", {
+      certificatePem: certificateInput.value.trim(),
+    });
+
+    if (id === requestId) certificateInfo.value = result;
   } catch (err) {
-    console.error('Error analyzing certificate:', err)
-    error.value = err instanceof Error ? err.message : 'Unknown error analyzing certificate'
+    if (id === requestId)
+      error.value = err instanceof Error ? err.message : String(err);
   } finally {
-    isLoading.value = false
+    if (id === requestId) isLoading.value = false;
   }
-}
+};
 
 const clearAnalysis = () => {
-  certificateInput.value = ''
-  certificateInfo.value = null
-  error.value = null
-}
+  certificateInput.value = "";
+  certificateInfo.value = null;
+  error.value = null;
+};
 
 const formatFingerprint = (fingerprint: string): string => {
-  return fingerprint.replace(/(.{2})(?=.)/g, '$1:').toUpperCase()
-}
+  return fingerprint.replace(/(.{2})(?=.)/g, "$1:").toUpperCase();
+};
 </script>
 
 <style lang="scss" scoped>
@@ -266,7 +400,7 @@ const formatFingerprint = (fingerprint: string): string => {
     border-radius: 8px;
     background: var(--bg-primary);
     color: var(--text-primary);
-    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-family: "SF Mono", "Monaco", "Consolas", monospace;
     font-size: 0.875rem;
     line-height: 1.4;
     resize: vertical;

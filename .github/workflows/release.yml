@@ -110,10 +110,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "lts/*"
-          cache: "yarn"
+          cache: "npm"
 
       - name: Install frontend dependencies
-        run: yarn install
+        run: npm ci
+
+      - name: Check tool logic
+        run: npm run check
+
+      - name: Test native commands
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib --locked
 
       - name: Set macOS deployment target
         if: runner.os == 'macOS'
@@ -131,7 +137,7 @@ jobs:
         shell: bash
         run: |
           echo "🔍 Pre-build verification:"
-          echo "About to build with yarn tauri build (native compilation)"
+          echo "About to build with npm run tauri build (native compilation)"
           echo "No cross-compilation targets will be specified"
           echo "Platform: ${{ matrix.platform }} → ${{ matrix.arch }}"
 
@@ -161,13 +167,13 @@ jobs:
           echo "📦 Building release for version: $VERSION (tag: $TAG)"
         shell: bash
 
-      # Build using direct yarn tauri build for better compatibility
+      # Build using direct npm run tauri build for better compatibility
       - name: Build the app
         shell: bash
         run: |
-          echo "🚀 Building with yarn tauri build (native compilation)"
+          echo "🚀 Building with npm run tauri build (native compilation)"
           echo "Platform: ${{ matrix.platform }} → ${{ matrix.arch }}"
-          yarn tauri build
+          npm run tauri build
 
       # Find and list built artifacts
       - name: Find build artifacts

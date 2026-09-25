@@ -4,19 +4,22 @@
   "version": "1.6.2",
   "identifier": "com.smartdev.smartdevtools.oss",
   "build": {
-    "beforeDevCommand": "yarn dev",
+    "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "yarn build",
+    "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist"
   },
   "app": {
     "windows": [
       {
         "label": "main",
+        "dragDropEnabled": false,
         "title": "Smart Dev Tools OSS",
-        "width": 1280,
-        "height": 720,
-        "resizable": false
+        "width": 1360,
+        "height": 800,
+        "resizable": true,
+        "minWidth": 720,
+        "minHeight": 520
       }
     ],
     "security": {

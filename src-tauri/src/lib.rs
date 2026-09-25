@@ -3,9 +3,10 @@ use rustls::{ClientConfig, ServerName};
 use serde::{Deserialize, Serialize};
 use sha1::Digest as Sha1Digest;
 use sha2;
-use std::net::ToSocketAddrs;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::net::TcpStream;
+use tokio::time::timeout;
 use tokio_rustls::TlsConnector;
 use x509_parser::prelude::*;
 
@@ -62,13 +63,20 @@ async fn get_tls_certificate_info(
     port: Option<u16>,
 ) -> Result<CertificateChainInfo, String> {
     let port = port.unwrap_or(443);
-    let addr = format!("{}:{}", hostname, port);
-
-    let socket_addr = addr
-        .to_socket_addrs()
-        .map_err(|e| format!("Failed to resolve address {}: {}", addr, e))?
-        .next()
-        .ok_or_else(|| format!("No valid address found for {}", addr))?;
+    if port == 0 || hostname.len() > 253 || hostname.trim() != hostname {
+        return Err("Enter a hostname and a port between 1 and 65535".into());
+    }
+    let domain = ServerName::try_from(hostname.as_str())
+        .map_err(|e| format!("Invalid hostname '{}': {}", hostname, e))?;
+    let deadline = Duration::from_secs(10);
+    let addresses: Vec<_> = timeout(deadline, tokio::net::lookup_host((hostname.as_str(), port)))
+        .await
+        .map_err(|_| "DNS lookup timed out after 10 seconds".to_string())?
+        .map_err(|e| format!("Failed to resolve {}: {}", hostname, e))?
+        .collect();
+    if addresses.is_empty() {
+        return Err("No address found for hostname".into());
+    }
 
     let mut root_store = rustls::RootCertStore::empty();
 
@@ -93,16 +101,13 @@ async fn get_tls_certificate_info(
 
     let connector = TlsConnector::from(Arc::new(config));
 
-    let stream = TcpStream::connect(socket_addr)
+    let stream = timeout(deadline, TcpStream::connect(addresses.as_slice()))
         .await
+        .map_err(|_| "Connection timed out after 10 seconds".to_string())?
         .map_err(|e| format!("Failed to connect to {}:{}: {}", hostname, port, e))?;
-
-    let domain = ServerName::try_from(hostname.as_str())
-        .map_err(|e| format!("Invalid hostname '{}': {}", hostname, e))?;
-
-    let tls_stream = connector
-        .connect(domain, stream)
+    let tls_stream = timeout(deadline, connector.connect(domain, stream))
         .await
+        .map_err(|_| "TLS handshake timed out after 10 seconds".to_string())?
         .map_err(|e| format!("TLS handshake failed with {}:{}: {}", hostname, port, e))?;
 
     let (_, connection) = tls_stream.into_inner();
@@ -153,14 +158,46 @@ async fn get_tls_certificate_info(
     })
 }
 
+fn unsigned_bits(bytes: &[u8]) -> usize {
+    match bytes.iter().position(|&b| b != 0) {
+        Some(start) => (bytes.len() - start - 1) * 8 + 8 - bytes[start].leading_zeros() as usize,
+        None => 0,
+    }
+}
+
+fn public_key_bits(key: &SubjectPublicKeyInfo<'_>) -> Option<usize> {
+    use x509_parser::public_key::PublicKey;
+    match key.parsed().ok()? {
+        PublicKey::RSA(rsa) => Some(unsigned_bits(rsa.modulus)),
+        PublicKey::EC(_) => match key
+            .algorithm
+            .parameters
+            .as_ref()?
+            .as_oid()
+            .ok()?
+            .to_string()
+            .as_str()
+        {
+            "1.2.840.10045.3.1.7" | "1.3.132.0.10" => Some(256),
+            "1.3.132.0.34" => Some(384),
+            "1.3.132.0.35" => Some(521),
+            _ => None, // Unknown curves are not estimated from DER size.
+        },
+        _ => None,
+    }
+}
+
 fn parse_certificate(cert_der: &[u8]) -> Result<CertificateDetails, String> {
-    let (_, cert) = X509Certificate::from_der(cert_der)
+    let (remaining, cert) = X509Certificate::from_der(cert_der)
         .map_err(|e| format!("Failed to parse certificate: {}", e))?;
+    if !remaining.is_empty() {
+        return Err("Unexpected data after certificate".into());
+    }
 
     let subject = cert.subject().to_string();
     let issuer = cert.issuer().to_string();
     let serial_number = hex::encode(&cert.serial.to_bytes_be());
-    let version = cert.version.0 as u32;
+    let version = cert.version.0 + 1;
 
     let not_before = cert.validity().not_before.to_string();
     let not_after = cert.validity().not_after.to_string();
@@ -173,31 +210,7 @@ fn parse_certificate(cert_der: &[u8]) -> Result<CertificateDetails, String> {
     let signature_algorithm = format!("{}", cert.signature_algorithm.algorithm);
 
     let public_key_algorithm = format!("{}", cert.public_key().algorithm.algorithm);
-    let public_key_size = match cert.public_key().algorithm.algorithm.to_string().as_str() {
-        "1.2.840.113549.1.1.1" => {
-            let key_data_len = cert.public_key().subject_public_key.data.len();
-            if key_data_len > 500 {
-                Some(4096)
-            } else if key_data_len > 300 {
-                Some(2048)
-            } else if key_data_len > 200 {
-                Some(1024)
-            } else {
-                Some(512)
-            }
-        }
-        "1.2.840.10045.2.1" => {
-            let key_data_len = cert.public_key().subject_public_key.data.len();
-            if key_data_len > 120 {
-                Some(521)
-            } else if key_data_len > 80 {
-                Some(384)
-            } else {
-                Some(256)
-            }
-        }
-        _ => None,
-    };
+    let public_key_size = public_key_bits(cert.public_key());
 
     let fingerprint_sha1 = hex::encode(sha1::Sha1::digest(cert_der)).to_uppercase();
     let fingerprint_sha256 = hex::encode(sha2::Sha256::digest(cert_der)).to_uppercase();
@@ -393,18 +406,23 @@ async fn download_certificate(
 
 #[tauri::command]
 async fn analyze_certificate_pem(certificate_pem: String) -> Result<CertificateDetails, String> {
-    // Remove PEM headers and decode base64
-    let pem_data = certificate_pem
-        .replace("-----BEGIN CERTIFICATE-----", "")
-        .replace("-----END CERTIFICATE-----", "")
-        .replace("\n", "")
-        .replace("\r", "")
-        .replace(" ", "");
-    
+    if certificate_pem.len() > 1024 * 1024 {
+        return Err("Certificate input exceeds 1 MiB".into());
+    }
+    let text = certificate_pem.trim();
+    let body = text
+        .strip_prefix("-----BEGIN CERTIFICATE-----")
+        .and_then(|s| s.strip_suffix("-----END CERTIFICATE-----"))
+        .ok_or("Expected one PEM CERTIFICATE block")?;
+    let pem_data: String = body
+        .chars()
+        .filter(|c| c.is_ascii_whitespace() == false)
+        .collect();
+
     let cert_der = general_purpose::STANDARD
         .decode(pem_data)
         .map_err(|e| format!("Failed to decode base64: {}", e))?;
-    
+
     parse_certificate(&cert_der)
 }
 
@@ -429,4 +447,95 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn exact_unsigned_bit_lengths() {
+        assert_eq!(unsigned_bits(&[]), 0);
+        assert_eq!(unsigned_bits(&[0, 0]), 0);
+        assert_eq!(unsigned_bits(&[0, 0x80, 0]), 16);
+        assert_eq!(unsigned_bits(&[1, 0, 1]), 17);
+        assert_eq!(unsigned_bits(&[0, 0x7f]), 7);
+    }
+    #[tokio::test]
+    async fn reject_invalid_certificates_and_ports() {
+        assert!(analyze_certificate_pem("not a PEM".into()).await.is_err());
+        assert!(analyze_certificate_pem(
+            "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----".into()
+        )
+        .await
+        .is_err());
+        assert!(get_tls_certificate_info("example.com".into(), Some(0))
+            .await
+            .is_err());
+        assert!(get_tls_certificate_info("https://example.com".into(), None)
+            .await
+            .is_err());
+    }
+    #[tokio::test]
+    async fn inspect_generated_public_certificates() {
+        // Synthetic, self-signed public certificates only; no private key is stored in the tests.
+        let pem = r#"-----BEGIN CERTIFICATE-----
+MIIDGzCCAgOgAwIBAgIUB34KnU+II3p4bJx4Gt1uwiqVGcowDQYJKoZIhvcNAQEL
+BQAwHTEbMBkGA1UEAwwSbG9jYWwtdGVzdC5pbnZhbGlkMB4XDTI2MDkyNDIzMzM0
+OVoXDTI2MDkyNTIzMzM0OVowHTEbMBkGA1UEAwwSbG9jYWwtdGVzdC5pbnZhbGlk
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAk8D88BYnqH46KFjp3nod
+RTqEIbVUXfBP2rg6CILxtpqUAUIkUcJz9ap2JbfycXlMwW00RBj83PjpMey5kJpE
+MsfreYYDktfM2eR9/vojgJBLFl2ilFUq405v6Gy2QwV5aNSRK4LbwiMw/25cnRo+
+JsfJfc5anRW6rH1rXL2GVs+nhf2IyHBc1ZRwl/xbT7cZKk6tzR094DtAMPwMWvLb
+KXmmImTFWbCZMN9PoUEPPRTYVfOPE8gL0b0pU+ktp8vN8T7qkFgq5ty4RyMEFtdY
+9drT+r89mJiwyuev9vs56OndlgtQpuwXyatThaagQU8EQsV+KWzXGAUV2MeSqqek
+9QIDAQABo1MwUTAdBgNVHQ4EFgQUToI7VAjEwNCF0olGbDtxxCgf1GcwHwYDVR0j
+BBgwFoAUToI7VAjEwNCF0olGbDtxxCgf1GcwDwYDVR0TAQH/BAUwAwEB/zANBgkq
+hkiG9w0BAQsFAAOCAQEAXyT1B/fIXclRDgTskNiAXeo3U6tvNGBpDd2aYEnsfUV5
+Gqx6iXHyEfD3HDqPLHqI+/ZY64rF1N3zBx/3bin0C2GKDgCgcczvTPUQtMKgvQ8H
+FtSWiT8kUAbHrTo5bHVa4T0JMw7rhwOhVQvwjd7r14HquA/WX5oO65BCx/PdLIji
+76IA47vmBdS5BwwO1mxm/tr4/58mIxd3D0ONmKxY0idJhlOT0MwEEQF5EkM1639O
+/qxR/eh3h9rR10/lvjM/vSIYMsZ8eVuNCNImNR4sIM4J7MsveyFeRREjw950DeG6
+qLdGmG0ANzXZVTJ3bOU2U7ndtX8inBoNacGr1HjOnQ==
+-----END CERTIFICATE-----
+"#;
+        let details = analyze_certificate_pem(pem.into()).await.unwrap();
+        assert_eq!(details.public_key_size, Some(2048));
+        assert_eq!(details.version, 3);
+        assert_eq!(
+            details.fingerprint_sha256,
+            "C54FFD82238E1CE807807C7893DBCC69820F220FE6689BD7248014066E0FE433"
+        );
+        let mut der = general_purpose::STANDARD
+            .decode(&details.der_certificate)
+            .unwrap();
+        der.push(0);
+        assert!(parse_certificate(&der).is_err());
+        let pem = r#"-----BEGIN CERTIFICATE-----
+MIICETCCAXKgAwIBAgIUSO2IyMCFvwPo/fldiyMu0ukE1lUwCgYIKoZIzj0EAwIw
+GjEYMBYGA1UEAwwPZWMtdGVzdC5pbnZhbGlkMB4XDTI2MDkyNDIzMzM0OVoXDTI2
+MDkyNTIzMzM0OVowGjEYMBYGA1UEAwwPZWMtdGVzdC5pbnZhbGlkMIGbMBAGByqG
+SM49AgEGBSuBBAAjA4GGAAQBVNKMQdCKNr92TSWiQFTnLpxJKp5xjq0aP152QduQ
+ivurVJt9jE+XcWJbr8FwNVAYEBp4umGjCLbstA+1FzOC9N8BTikwU0wOxz6lOFS8
+q/S89U2RXRjOdtVVHPUSRHLhKj/FHgh2OaWPt46q/wZ2NqySIYcnncnW9AU1Y6JH
+b6DOq9ajUzBRMB0GA1UdDgQWBBQDcSNunqUTSy8m7KQgERjOL07hlTAfBgNVHSME
+GDAWgBQDcSNunqUTSy8m7KQgERjOL07hlTAPBgNVHRMBAf8EBTADAQH/MAoGCCqG
+SM49BAMCA4GMADCBiAJCAOf+03Xgd1t9qjujz82+LfXMDEenYONPVjEIL8zLH/wL
+J4AjxQ02G1+ke3G1iUgCtLZivvmMaTQo2xc1TL7UnopwAkIB07dqr+q9aMEU8z1C
+I/kAsaVLofL+2HsB6O7JSplmGh7A8C6GGizHFc8Nmc+eBvh+mhoY8WNk6rlch0r2
+8EkBaIo=
+-----END CERTIFICATE-----
+"#;
+        let details = analyze_certificate_pem(pem.into()).await.unwrap();
+        assert_eq!(details.public_key_size, Some(521));
+        assert_eq!(details.version, 3);
+        assert_eq!(
+            details.fingerprint_sha256,
+            "DC1D26B04DA4BCD2406E45EDD0E6B120DC742DCEE02AC2F088A9D8DDEFA78D6D"
+        );
+        let mut der = general_purpose::STANDARD
+            .decode(&details.der_certificate)
+            .unwrap();
+        der.push(0);
+        assert!(parse_certificate(&der).is_err());
+    }
 }

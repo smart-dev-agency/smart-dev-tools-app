@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.0.0] - 2025-09-24
+
+### Added
+
+- Unified workspace: real tool search (Cmd/Ctrl+K), favorites/recent tools, light/dark/system themes, collapsible navigation, resizable window and session clearing.
+- Hash encodings/case/separators, algorithm selection, checksum comparison, exact copy/export; HMAC, JSON, URL and UUID tools.
+- Background workers, incremental file hashing with progress/cancellation and drag-and-drop, regex timeout, aligned bounded line diffs, lighter Markdown editing and QR PNG export.
+
+### Fixed
+
+- Replaced simulated MD5/SHA fallbacks and RSA results with real, regression-checked computations.
+- Corrected RSA certificate bit lengths and X.509 version; bounded native TLS operations; certificate exports no longer reconnect.
+- Preserved large JSON numbers and unchanged JWT claims; strict byte/date validation, stale-result invalidation and explicit unverified-token warnings.
+- Corrected JWT warning padding and spacing; improved keyboard controls, focus, theme consistency and safe Markdown preview.
+
+### Maintenance
+
+- Lazy-loaded tools; removed Monaco and unused packages/components. Standardized npm ci across local development and CI; repaired lockfile and added regression checks.
+
 ## [1.6.2] - 2025-08-19
 
 ### Fixed
@@ -18,7 +37,7 @@
 ### Updated
 
 - **Application Icons**: Regenerated all application icons from updated source
-  - Regenerated macOS app icons (icon.icns) 
+  - Regenerated macOS app icons (icon.icns)
   - Updated Windows app icons (icon.ico)
   - Refreshed PNG icons for all platforms (32x32, 64x64, 128x128, 256x256, 512x512, 1024x1024)
   - Updated Windows Store logos (Square30x30, Square44x44, Square71x71, etc.)
@@ -31,6 +50,7 @@
 ### Added
 
 - **Certificate Analyzer**: New security tool for analyzing X.509 certificates
+
   - Real certificate parsing using node-forge library
   - Support for PEM and DER formats
   - Comprehensive certificate information display (subject, issuer, validity, etc.)
@@ -40,8 +60,8 @@
   - Extension parsing (Key Usage, Subject Alt Names, Basic Constraints, etc.)
   - Export functionality (copy, download, JSON export)
   - Dark mode support
-
 - **RSA Key Analyzer**: New security tool for analyzing RSA keys
+
   - Support for both private and public RSA keys
   - PEM format parsing and validation
   - Key component extraction (modulus, exponents, primes)
@@ -55,18 +75,19 @@
 ### Improved
 
 - **JWT/Token Decoder**: Enhanced to support multiple token formats
+
   - Automatic format detection (standard JWT vs Base64-encoded JSON)
   - Support for Base64-encoded JSON tokens (like server certificate bundles)
   - Improved error handling and user feedback
   - Better token type identification
   - Enhanced payload analysis for different token structures
-
 - **Security Tools Category**: Expanded with comprehensive certificate and key analysis tools
+
   - TLS Certificate Checker (existing)
   - Certificate Analyzer (new)
   - RSA Key Analyzer (new)
-
 - **Certificate Extensions Parsing**: Advanced parsing for complex certificate extensions
+
   - Authority Information Access with URL extraction
   - Certificate Policies with OID mapping
   - CRL Distribution Points

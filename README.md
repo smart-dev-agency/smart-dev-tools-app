@@ -1,235 +1,61 @@
-# 🛠️ Smart Dev Tools
+# Smart Dev Tools
 
-A comprehensive suite of development tools in a modern and efficient desktop application, built with **Tauri**, **Vue 3**, and **TypeScript**.
+A local-first developer workspace built with Vue 3, TypeScript and Tauri 2.
 
-## ✨ Features
+## Tools
 
-**Smart Dev Tools** is an all-in-one application that provides essential tools for developers, designed to be fast, secure, and easy to use.
+- **Text / File Hash**: real SHA-256, SHA-512, SHA-1 and MD5; UTF-8, hex and Base64 input; choose or drop a file, then hash incrementally with progress and cancellation.
+- **Digest formatting**: hexadecimal upper/lowercase, spaces/colons/dashes, Base64/Base64URL, exact copy/export and expected-checksum comparison.
+- **HMAC**: SHA-256/SHA-512, explicit message/key encodings; keys stay in session memory.
+- **RSA Inspector**: parse unencrypted PKCS#1, PKCS#8 and SPKI; inspect actual components, export the public key and calculate SPKI DER fingerprints.
+- **JWT Decoder**: unchanged claims and readable dates. Decoding does **not** verify the signature or trust claims.
+- **Certificate Inspector / TLS Checker**: local PEM inspection and native TLS chain inspection. Local parsing is not trust validation; TLS uses system/bundled roots, not a revocation check.
+- **Base64 & Hex**, **URL Toolkit**, **JSON Formatter** (preserves numeric precision and duplicate keys), **UUID v4 Generator**.
+- **Text Diff**, **Regex Tester**, **Markdown Editor**, **Text Analyzer**, **Date Converter**, **QR Toolkit** (generate, copy/export PNG, scan an image).
 
-### 🌐 Web Tools
+## Workspace
 
-- **JWT Decoder** - Securely decode and analyze JWT tokens
-- **Base64 Converter** - Encode and decode text to/from Base64
-- **QR Generator** - Generate custom QR codes from text
+Search tools with **Cmd/Ctrl+K**, pin favorites, revisit recent tools, collapse the sidebar and choose light, dark or system appearance. The desktop window is resizable (minimum 720 × 520).
 
-### 📝 Text Tools
+Tool drafts and results survive navigation **only in memory**. Closing/reloading the app or choosing **Clear session data** discards them. Only appearance, sidebar, favorite/recent tool IDs and update preferences are stored locally. Explicit clipboard/export actions put data in the system clipboard or a file you choose; clear-session does not erase those copies.
 
-- **Regex Tester** - Test and validate regular expressions in real-time
-- **Markdown Editor** - Markdown editor with live preview
-- **Text Analyzer** - Analyze detailed text metrics (words, characters, etc.)
+Processing is local. TLS checks contact the server you enter; the desktop app checks GitHub for updates at most once per day after a successful automatic check (or on demand). Explicitly opening a link leaves the app. Markdown previews omit embedded resources, CSS and active content to avoid implicit network requests.
 
-### 📅 Date Tools
+## Development
 
-- **Date Converter** - Convert between different date formats and timestamps
+Requirements: Node.js 20.19+ (or a compatible newer LTS), npm, Rust and the platform's [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/). The CLI is included; no global installation is needed.
 
-### 📁 File Tools
-
-- **File Hasher** - Generate cryptographic hashes (MD5, SHA-1, SHA-256) for files
-
-## 🚀 Technologies
-
-- **Frontend**: Vue 3 + TypeScript + Vite
-- **Backend**: Rust + Tauri
-- **Styling**: SCSS + CSS Grid
-- **Key Libraries**:
-  - Monaco Editor (code editor)
-  - CodeMirror (specialized editor)
-  - Marked (Markdown processing)
-  - CryptoJS (cryptographic functions)
-  - QRCode.js (QR code generation)
-
-## 📦 Installation
-
-### Download Pre-built Binaries (Recommended)
-
-Pre-built binaries are automatically generated for all platforms:
-
-1. Visit the [Releases page](https://github.com/your-username/smart-dev-tools-app/releases)
-2. Download the appropriate version for your platform:
-   - **macOS Intel**: Files ending with `_x64.dmg`
-   - **macOS Apple Silicon (M1/M2/M3)**: Files ending with `_aarch64.dmg`
-   - **Windows**: Files ending with `_x64-setup.exe` or `_x64_en-US.msi`
-   - **Linux**: Files ending with `.deb`, `.rpm`, or `.AppImage`
-3. Install the downloaded package following your platform's standard installation process
-
-**⚠️ Important for macOS users**: These apps are unsigned and require bypassing Gatekeeper. See our detailed [macOS Installation Guide](MACOS_INSTALLATION.md) for step-by-step instructions.
-
-### Build from Source
-
-#### Prerequisites
-
-- **Node.js** (version 16 or higher)
-- **Rust** (latest stable version)
-- **Yarn** (recommended) or npm
-
-### Clone the repository
-
-```bash
-git clone https://github.com/your-username/smart-dev-tools-app.git
-cd smart-dev-tools-app
+```sh
+npm ci
+npm run check               # Algorithm/parser regression checks
+npm run dev                 # Browser preview; no native certificate IPC
+npm run tauri dev           # Desktop application
+npm run build               # Type-check and production frontend build
+npm run tauri build         # Native packages for the current platform
+cargo test --manifest-path src-tauri/Cargo.toml --lib --locked
 ```
 
-### Install dependencies
+Use **package-lock.json / npm ci** as the single dependency source. Do not mix package managers. Restart the dev server after reinstalling dependencies.
 
-```bash
-# Install frontend dependencies
-yarn install
+Downloads: [releases](https://github.com/smart-dev-agency/smart-dev-tools-app/releases). Packaging/signing is separate from the source changes; this workspace does not publish a release.
 
-# Or with npm
-npm install
-```
+## Implementation and limits
 
-### Setup Rust/Tauri environment
+- Tools load lazily. Heavy computations run in terminable module workers. File hashes read 2 MiB chunks rather than loading the entire file.
+- Text/JSON conversion: up to 4 MiB of input; large result previews are clipped with an explicit notice while copy/export retain the full output. Hash text limits use UTF-8 bytes; other text limits use JavaScript string length.
+- Regex: 2-second timeout, 1 MiB input, 1,000 matches / 2 MiB captures.
+- Diff: automatic comparison pauses beyond 200,000 characters or 2,000 total lines; explicit comparison supports up to 40,000 total lines / 4 MiB text, bounded to 4 million LCS cells, 100 rendered rows per page.
+- Markdown: debounced preview; manual above 200,000 characters; source preview limit 1 MiB and generated HTML 2 MiB. Source is always available for copy/export. The editor is disposed when hidden; text is preserved, undo history is not.
+- QR scanning: raster images up to 20 MiB, scaled to at most 2,000 pixels per side; worker cancellation/timeout.
+- TLS: DNS, connection and handshake each time out after 10 seconds. PEM certificate input is limited to 1 MiB; RSA key input to 128 KiB.
+- MD5/SHA-1 are labeled legacy. Formatting a digest does not make it more secure. RSA structural checks do not certify entropy, provenance or compliance.
 
-```bash
-# Install Tauri CLI
-cargo install tauri-cli
+`src/App.vue` owns navigation/session preferences. `src/shared/lib/tools.ts` is the catalog. Register a new tool there and add its lazy loader in App; reuse shared panels, outputs, tokens and workers instead of introducing a second theme or persistence layer.
 
-# Or with npm
-npm install -g @tauri-apps/cli
-```
+## Validation
 
-## 🏃‍♂️ Development
+See [review](docs/reviews/2026-09-24-ui-and-tools-review.md) and [implementation / QA notes](docs/reviews/2026-09-24-implementation-validation.md) for measurements, checks and remaining platform verification. Tests are included in the build/release workflows. A successful local macOS build does not establish Windows/Linux or all macOS-version compatibility.
 
-### Development mode
+## License and support
 
-```bash
-# Run in development mode
-yarn tauri dev
-
-# Or with npm
-npm run tauri dev
-```
-
-### Build for production
-
-```bash
-# Build the application
-yarn tauri build
-
-# Or with npm
-npm run tauri build
-```
-
-### Available scripts
-
-```bash
-yarn dev          # Run frontend in development mode
-yarn build        # Build frontend for production
-yarn preview      # Preview production build
-yarn tauri dev    # Run Tauri application in development
-yarn tauri build  # Build Tauri application for production
-```
-
-## 🏗️ Project Structure
-
-```
-smart-dev-tools-app/
-├── src/                          # Frontend source code
-│   ├── App.vue                   # Main component
-│   ├── main.ts                   # Entry point
-│   └── shared/
-│       ├── componentes/          # Vue components
-│       │   ├── Base64Converter.vue
-│       │   ├── DateConverter.vue
-│       │   ├── FileHasher.vue
-│       │   ├── JwtDecode.vue
-│       │   ├── MarkdownEditor.vue
-│       │   ├── QrCodeTool.vue
-│       │   ├── RegexTester.vue
-│       │   └── TextAnalyzer.vue
-│       └── styles/               # SCSS styles
-├── src-tauri/                    # Tauri source code (Rust)
-│   ├── src/
-│   │   ├── main.rs
-│   │   └── lib.rs
-│   ├── Cargo.toml
-│   └── tauri.conf.json          # Tauri configuration
-├── public/                       # Static files
-├── package.json
-└── vite.config.ts               # Vite configuration
-```
-
-## 🎯 Technical Features
-
-### Security
-- **CSP (Content Security Policy)** configured
-- Local data processing (no data sent to external servers)
-- Input validation and sanitization
-
-### Performance
-- **Optimized bundle size** thanks to Tauri
-- **Hot reload** in development
-- **Lazy loading** of components
-
-### Interface
-- **Responsive design** with CSS Grid
-- **Navigable sidebar** with search
-- **Intuitive categorization** of tools
-- **Modern and accessible** theme
-
-### Automated Builds
-- **Cross-platform compilation** via GitHub Actions
-- **Multi-architecture support**: Intel, ARM64, Apple Silicon
-- **Automatic releases** on main branch updates
-- **Artifact storage** for easy distribution
-
-## 🔧 Configuration
-
-### Tauri Configuration
-
-The `src-tauri/tauri.conf.json` file contains the main configuration:
-
-```json
-{
-  "productName": "Smart Dev Tools",
-  "version": "1.0.0",
-  "identifier": "com.smartdev.smartdevtools"
-}
-```
-
-## 🤝 Contributing
-
-1. **Fork** the repository
-2. Create a **feature branch** (`git checkout -b feature/new-tool`)
-3. **Commit** your changes (`git commit -am 'Add new tool'`)
-4. **Push** to the branch (`git push origin feature/new-tool`)
-5. Open a **Pull Request**
-
-### Adding a new tool
-
-1. Create a new component in `src/shared/componentes/`
-2. Import and register the component in `App.vue`
-3. Add the tool to the `categories` array with its corresponding category
-4. Make sure to follow existing design patterns
-
-## 📋 Roadmap
-
-- [ ] **Color Tools** (Picker, Palettes, Conversion)
-- [ ] **Network Tools** (IP Info, Port Scanner)
-- [ ] **JSON Tools** (Formatter, Validator, Minifier)
-- [ ] **SQL Tools** (Formatter, Query Builder)
-- [ ] **Custom plugins**
-- [ ] **Cloud synchronization**
-
-## 📄 License
-
-This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for more details.
-
-## 👨‍💻 Author
-
-Developed by **Smart Dev Agency**
-
----
-
-## 🆘 Support
-
-If you encounter any issues or have suggestions:
-
-1. Check [existing Issues](https://github.com/your-username/smart-dev-tools-app/issues)
-2. Create a [new Issue](https://github.com/your-username/smart-dev-tools-app/issues/new) if needed
-3. Provide details about your operating system, app version, and steps to reproduce the problem
-
----
-
-**Made with ❤️ for the developer community!**
+MIT — see [LICENSE](LICENSE). Report reproducible problems with OS, app version and steps in [Issues](https://github.com/smart-dev-agency/smart-dev-tools-app/issues).

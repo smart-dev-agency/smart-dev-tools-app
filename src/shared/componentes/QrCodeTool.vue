@@ -1,519 +1,332 @@
 <template>
-  <ComponentViewer title="QR Generator & Scanner">
-    <BaseCard>
-      <div class="qr-tool-content">
-        <div class="tabs">
-          <button class="tab-button" :class="{ active: activeTab === 'generate' }" @click="activeTab = 'generate'">Generate QR</button>
-          <button class="tab-button" :class="{ active: activeTab === 'scan' }" @click="activeTab = 'scan'">Scan QR</button>
+  <ComponentViewer title="QR Toolkit">
+    <div class="controls qr-tabs">
+      <BaseButton
+        :variant="tab === 'generate' ? 'primary' : 'secondary'"
+        :aria-pressed="tab === 'generate'"
+        @click="tab = 'generate'"
+        >Generate QR</BaseButton
+      ><BaseButton
+        :variant="tab === 'scan' ? 'primary' : 'secondary'"
+        :aria-pressed="tab === 'scan'"
+        @click="tab = 'scan'"
+        >Scan image</BaseButton
+      >
+    </div>
+    <div v-if="tab === 'generate'" class="workbench">
+      <BasePanel title="Content & appearance">
+        <BaseInput
+          v-model="content"
+          placeholder="Text or URL to encode…"
+          multiline
+          :rows="8"
+        />
+        <div class="controls action-row">
+          <label class="field"
+            >Size<select v-model="size">
+              <option :value="100">100 × 100</option>
+              <option :value="200">200 × 200</option>
+              <option :value="300">300 × 300</option>
+              <option :value="400">400 × 400</option>
+            </select></label
+          ><label class="field"
+            >Foreground<input type="color" v-model="foreground" /></label
+          ><label class="field"
+            >Background<input type="color" v-model="background"
+          /></label>
         </div>
-
-        <div v-if="activeTab === 'generate'" class="tab-content">
-          <div class="input-section">
-            <BaseInput v-model="qrContent" placeholder="Type or paste the content for the QR code" multiline :rows="5" />
-
-            <div class="options-section">
-              <div class="input-group">
-                <label>Size:</label>
-                <select v-model="qrSize" class="form-select">
-                  <option value="100">Small (100x100)</option>
-                  <option value="200">Medium (200x200)</option>
-                  <option value="300">Large (300x300)</option>
-                  <option value="400">Extra Large (400x400)</option>
-                </select>
-              </div>
-
-              <div class="input-group">
-                <label>Color:</label>
-                <input type="color" v-model="qrColor" class="color-picker" />
-              </div>
-
-              <div class="input-group">
-                <label>Background:</label>
-                <input type="color" v-model="qrBackground" class="color-picker" />
-              </div>
-            </div>
-
-            <BaseButton @click="generateQR" :disabled="!qrContent"> Generate QR </BaseButton>
-          </div>
-
-          <div class="qr-result">
-            <div v-if="error" class="error-message">{{ error }}</div>
-            <div v-else-if="qrDataUrl" class="qr-image-container">
-              <BasePanel title="Generated QR Code">
-                <div class="qr-display-container">
-                  <img :src="qrDataUrl" alt="QR Code" class="qr-image" />
-                </div>
-                <div class="qr-actions">
-                  <BaseButton @click="copyQR" class="action-btn">
-                    {{ copied ? "Copied!" : "Copy QR" }}
-                  </BaseButton>
-                </div>
-              </BasePanel>
-            </div>
-            <div v-else class="placeholder-message">The generated QR code will be shown here</div>
-          </div>
+        <div class="action-row">
+          <BaseButton @click="generate" :disabled="!content || generating">{{
+            generating ? "Generating…" : "Generate QR"
+          }}</BaseButton
+          ><BaseButton variant="secondary" @click="content = ''"
+            >Clear</BaseButton
+          >
         </div>
-
-        <div v-else class="tab-content">
-          <div class="scanner-section">
-            <BasePanel title="Upload image with QR code">
-              <div class="drop-zone" @click="openFileDialog" :class="{ loading: isLoading }">
-                <div v-if="isLoading" class="loader"></div>
-                <p v-if="!scanFile && !isLoading">Click here to select an image with QR</p>
-                <p v-if="scanFile && !isLoading">Image: {{ scanFile.name }}</p>
-                <input type="file" ref="scanFileInput" @change="onScanFileChange" accept="image/*" style="display: none" />
-              </div>
-            </BasePanel>
-
-            <div v-if="scanResult" class="scan-result">
-              <BasePanel title="Detected content">
-                <pre class="scan-content">{{ scanResult }}</pre>
-                <div class="link-check" v-if="isUrl(scanResult)">
-                  <BaseButton @click="openLink(scanResult)" class="open-link-btn"> Open link </BaseButton>
-                </div>
-              </BasePanel>
-            </div>
-
-            <div v-if="scanError" class="error-message">
-              {{ scanError }}
-            </div>
+        <p class="hint">
+          Use contrasting colors and preserve the quiet border for reliable
+          scanning. Capacity depends on content; very long input may not fit.
+        </p>
+        <p v-if="error" class="error" role="alert">{{ error }}</p>
+      </BasePanel>
+      <BasePanel title="QR image"
+        ><template v-if="dataUrl"
+          ><div class="qr-image">
+            <img :src="dataUrl" alt="Generated QR code" />
           </div>
-        </div>
-      </div>
-    </BaseCard>
+          <div class="controls">
+            <BaseButton @click="copyImage" variant="secondary">{{
+              copied ? "Copied" : "Copy image"
+            }}</BaseButton
+            ><BaseButton @click="download" variant="secondary"
+              >Save PNG</BaseButton
+            >
+          </div></template
+        >
+        <div v-else class="empty-result">
+          <span class="empty-symbol">qr</span>
+          <h2>Your code, ready to share</h2>
+          <p>Generate a local QR image from text or a link.</p>
+        </div></BasePanel
+      >
+    </div>
+    <div v-else class="workbench">
+      <BasePanel title="Image to scan"
+        ><input
+          ref="fileInput"
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif,image/bmp"
+          hidden
+          @change="choose"
+        /><button
+          class="drop-zone"
+          @click="fileInput?.click()"
+          @dragover.prevent
+          @drop.prevent="drop"
+        >
+          {{
+            decoding || busy
+              ? "Reading QR image…"
+              : fileName || "Choose or drop an image"
+          }}
+        </button>
+        <p class="hint">
+          PNG, JPEG, WebP, GIF or BMP · up to 20 MiB. Large images are scaled to
+          2,000 pixels per side. Scanning runs in a cancellable worker.
+        </p>
+        <BaseButton
+          v-if="busy || decoding"
+          class="action-row"
+          variant="secondary"
+          @click="cancelScan"
+          >Cancel</BaseButton
+        >
+        <p v-if="scanError" class="error" role="alert">
+          {{ scanError }}
+        </p></BasePanel
+      >
+      <BasePanel title="Detected content" :content="result ?? undefined"
+        ><template v-if="result !== null">
+          <pre>{{ result }}</pre>
+          <BaseButton
+            v-if="linkAllowed"
+            class="action-row"
+            variant="secondary"
+            @click="openLink"
+            >Open link</BaseButton
+          >
+          <p v-if="linkAllowed" class="hint">
+            Opening a link leaves this app. Check the destination first.
+          </p></template
+        >
+        <div v-else class="empty-result">
+          <span class="empty-symbol">↗</span>
+          <h2>Read before you open</h2>
+          <p>Decoded content appears here; links never open automatically.</p>
+        </div></BasePanel
+      >
+    </div>
   </ComponentViewer>
 </template>
-
 <script setup lang="ts">
-import jsQR from "jsqr";
 import QRCode from "qrcode";
-import clipboard from "tauri-plugin-clipboard-api";
-import { ref } from "vue";
-import BaseButton from "./BaseButton.vue";
-import BaseCard from "./BaseCard.vue";
+import { isTauri } from "@tauri-apps/api/core";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { decodeBytes } from "../lib/binary";
+import { droppedFile } from "../lib/fileDrop";
+import { openExternal, saveBytes } from "../lib/output";
+import { useWorker } from "../lib/useWorker";
 import BaseInput from "./BaseInput.vue";
+import BaseButton from "./BaseButton.vue";
 import BasePanel from "./BasePanel.vue";
 import ComponentViewer from "./ComponentViewer.vue";
-
-const activeTab = ref("generate");
-const isLoading = ref(false);
-
-const qrContent = ref("");
-const qrSize = ref("200");
-const qrColor = ref("#000000");
-const qrBackground = ref("#FFFFFF");
-const qrDataUrl = ref("");
-const error = ref("");
-const copied = ref(false);
-
-const scanFileInput = ref<HTMLInputElement | null>(null);
-const scanFile = ref<File | null>(null);
-const scanResult = ref("");
-const scanError = ref("");
-
-async function generateQR() {
-  if (!qrContent.value) {
-    error.value = "Please enter content to generate the QR code";
-    return;
-  }
-
-  error.value = "";
-  isLoading.value = true;
-
-  try {
-    const options = {
-      width: parseInt(qrSize.value),
-      margin: 1,
-      color: {
-        dark: qrColor.value,
-        light: qrBackground.value,
-      },
-    };
-
-    qrDataUrl.value = await QRCode.toDataURL(qrContent.value, options);
-  } catch (err: any) {
-    error.value = `Error generating QR code: ${err.message}`;
-    qrDataUrl.value = "";
-  } finally {
-    isLoading.value = false;
-  }
-}
-
-async function copyQR() {
-  if (!qrDataUrl.value) return;
-  try {
+const tab = ref("generate"),
+  content = ref(""),
+  size = ref(200),
+  foreground = ref("#000000"),
+  background = ref("#ffffff"),
+  dataUrl = ref(""),
+  error = ref(""),
+  generating = ref(false),
+  copied = ref(false);
+const fileInput = ref<HTMLInputElement>(),
+  fileName = ref(""),
+  decoding = ref(false);
+const { result, busy, error: scanError, run, reset } = useWorker<string>();
+let generateId = 0,
+  scanId = 0;
+watch(
+  [content, size, foreground, background],
+  () => {
+    generateId++;
+    dataUrl.value = "";
     error.value = "";
-    const base64String = qrDataUrl.value.split(",")[1];
-
-    if (!base64String) {
-      throw new Error("Invalid image format");
-    }
-
-    await clipboard.writeImageBase64(base64String);
-
-    copied.value = true;
-    setTimeout(() => {
-      copied.value = false;
-    }, 2000);
-  } catch (err: any) {
-    error.value = `Could not copy image to clipboard: ${err instanceof Error ? err.message : String(err)}`;
-  }
-}
-
-function openFileDialog() {
-  scanFileInput.value?.click();
-}
-
-async function onScanFileChange(event: Event) {
-  scanError.value = "";
-  scanResult.value = "";
-  isLoading.value = true;
-
-  const target = event.target as HTMLInputElement;
-  if (target.files && target.files.length > 0) {
-    scanFile.value = target.files[0];
-    await scanQRCode(target.files[0]);
-  } else {
-    isLoading.value = false;
-  }
-
-  if (target) {
-    target.value = "";
-  }
-}
-
-async function scanQRCode(file: File) {
+    copied.value = false;
+    generating.value = false;
+  },
+  { flush: "sync" },
+);
+async function generate() {
+  const id = ++generateId;
+  error.value = "";
+  dataUrl.value = "";
+  generating.value = true;
   try {
-    const imageData = await readFileAsImageData(file);
-    const code = jsQR(imageData.data, imageData.width, imageData.height);
-
-    if (code) {
-      scanResult.value = code.data;
-    } else {
-      scanError.value = "No QR code detected in the image";
-    }
-  } catch (err: any) {
-    scanError.value = `Error processing image: ${err.message}`;
+    if (content.value.length > 5000)
+      throw new Error(
+        "Content is too long for a QR code. Use fewer than 5,000 characters.",
+      );
+    const url = await QRCode.toDataURL(content.value, {
+      width: size.value,
+      margin: 4,
+      color: { dark: foreground.value, light: background.value },
+    });
+    if (id === generateId) dataUrl.value = url;
+  } catch (e) {
+    if (id === generateId) error.value = String(e);
   } finally {
-    isLoading.value = false;
+    if (id === generateId) generating.value = false;
   }
 }
-
-function readFileAsImageData(file: File): Promise<ImageData> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onload = (e) => {
-      if (!e.target?.result) {
-        reject(new Error("Error reading file"));
-        return;
-      }
-
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-
-        if (!ctx) {
-          reject(new Error("Could not create canvas context"));
-          return;
-        }
-
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
-
-        try {
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          resolve(imageData);
-        } catch (error) {
-          reject(new Error("Error processing image"));
-        }
-      };
-
-      img.onerror = () => {
-        reject(new Error("Error loading image"));
-      };
-
-      img.src = e.target.result as string;
-    };
-
-    reader.onerror = () => {
-      reject(new Error("Error reading file"));
-    };
-
-    reader.readAsDataURL(file);
-  });
+function imageBytes() {
+  return decodeBytes(dataUrl.value.split(",")[1], "base64");
 }
-
-function isUrl(str: string): boolean {
+async function copyImage() {
   try {
-    new URL(str);
-    return true;
+    if (isTauri()) {
+      const { writeImageBase64 } = await import("tauri-plugin-clipboard-api");
+      await writeImageBase64(dataUrl.value.split(",")[1]);
+    } else
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "image/png": (() => {
+            const bytes = imageBytes();
+            const buffer = new ArrayBuffer(bytes.byteLength);
+            new Uint8Array(buffer).set(bytes);
+            return new Blob([buffer], { type: "image/png" });
+          })(),
+        }),
+      ]);
+    copied.value = true;
+  } catch (e) {
+    error.value = `Could not copy image: ${e}. Save PNG instead.`;
+  }
+}
+async function download() {
+  try {
+    await saveBytes(imageBytes(), "qr-code.png", "image/png");
+  } catch (e) {
+    error.value = String(e);
+  }
+}
+function cancelScan() {
+  scanId++;
+  decoding.value = false;
+  reset();
+}
+function choose(event: Event) {
+  const input = event.target as HTMLInputElement;
+  if (input.files?.[0]) scan(input.files[0]);
+  input.value = "";
+}
+function drop(event: DragEvent) {
+  cancelScan();
+  try {
+    scan(droppedFile(event.dataTransfer));
+  } catch (cause) {
+    scanError.value =
+      cause instanceof Error
+        ? cause.message
+        : "Could not read the dropped image.";
+  }
+}
+async function scan(file: File) {
+  cancelScan();
+  const id = scanId;
+  fileName.value = file.name;
+  decoding.value = true;
+  let url = "";
+  try {
+    if (file.size > 20 * 1024 * 1024) throw new Error("Image exceeds 20 MiB.");
+    if (!/^image\/(png|jpeg|webp|gif|bmp)$/.test(file.type))
+      throw new Error("Choose a PNG, JPEG, WebP, GIF or BMP image.");
+    url = URL.createObjectURL(file);
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    if (id !== scanId) return;
+    const scale = Math.min(
+      1,
+      2000 / Math.max(img.naturalWidth, img.naturalHeight),
+    );
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Image decoding is unavailable.");
+    context.drawImage(img, 0, 0, canvas.width, canvas.height);
+    run(
+      {
+        kind: "scan",
+        pixels: context.getImageData(0, 0, canvas.width, canvas.height).data,
+        width: canvas.width,
+        height: canvas.height,
+      },
+      10000,
+    );
+  } catch (e) {
+    if (id === scanId) scanError.value = String(e);
+  } finally {
+    if (url) URL.revokeObjectURL(url);
+    if (id === scanId) decoding.value = false;
+  }
+}
+const linkAllowed = computed(() => {
+  try {
+    return ["https:", "http:", "mailto:"].includes(
+      new URL(result.value ?? "").protocol,
+    );
   } catch {
     return false;
   }
+});
+async function openLink() {
+  try {
+    await openExternal(result.value!);
+  } catch (e) {
+    scanError.value = String(e);
+  }
 }
-
-function openLink(url: string) {
-  window.open(url, "_blank");
-}
+onBeforeUnmount(() => {
+  generateId++;
+  cancelScan();
+});
 </script>
-
-<style scoped lang="scss">
-.qr-tool-content {
-  display: flex;
-  flex-direction: column;
-  padding: 1rem;
-  width: 100%;
-  height: 100%;
-  overflow-y: auto;
+<style scoped>
+.qr-tabs {
+  margin-bottom: 20px;
 }
-
-.tabs {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
-  border-bottom: 1px solid var(--input-border);
-  padding-bottom: 1rem;
-}
-
-.tab-button {
-  padding: 0.6em 1.2em;
-  border: 2px solid var(--input-border);
-  border-radius: 8px;
-  background: var(--panel-content-bg);
-  color: var(--text-primary);
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.25s ease;
-
-  &.active {
-    background: var(--button-bg);
-    color: var(--button-color);
-    border-color: var(--button-border);
-  }
-
-  &:hover:not(.active) {
-    border-color: var(--button-bg);
-    background: var(--input-bg);
-  }
-}
-
-.tab-content {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-
-  @media (min-width: 768px) {
-    flex-direction: row;
-  }
-}
-
-.input-section,
-.scanner-section {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.options-section {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.input-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-
-  label {
-    font-size: 0.9rem;
-    color: var(--text-secondary);
-  }
-}
-
-.form-select {
-  padding: 0.6em 1.2em;
-  border-radius: 8px;
-  border: 1px solid var(--input-border);
-  background-color: var(--input-bg);
-  color: var(--input-color);
-  font-size: 1em;
-  transition: all 0.2s ease;
-
-  &:focus {
-    border-color: var(--button-bg);
-    outline: none;
-  }
-}
-
-.color-picker {
-  width: 100%;
-  height: 40px;
-  padding: 0;
-  border: 1px solid var(--input-border);
-  border-radius: 8px;
-  cursor: pointer;
-
-  &::-webkit-color-swatch {
-    border: none;
-    border-radius: 6px;
-  }
-}
-
-.qr-result,
-.scan-result {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  margin-top: 1rem;
-
-  @media (min-width: 768px) {
-    margin-top: 0;
-  }
-}
-
-.qr-image-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  background: var(--panel-content-bg);
-  border-radius: 12px;
-  padding: 1rem;
-  max-width: 100%;
-  overflow: hidden;
-}
-
-.qr-display-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  min-height: 300px;
-  padding: 1rem;
-  background: var(--panel-bg);
-  border-radius: 8px;
-}
-
 .qr-image {
+  display: grid;
+  place-items: center;
+  min-height: 260px;
+  margin-bottom: 16px;
+}
+.qr-image img {
   max-width: 100%;
-  max-height: 100%;
-  display: block;
-  margin: 0 auto;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border-radius: 4px;
+  height: auto;
 }
-
-.qr-actions {
-  display: flex;
-  justify-content: center;
-  padding: 0 1rem;
-  margin-top: 1.5rem;
-}
-
-.action-btn {
-  min-width: 150px;
-  max-width: 200px;
-  height: 44px;
-}
-
-.placeholder-message {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 300px;
-  background: var(--panel-content-bg);
-  border-radius: 12px;
-  color: var(--placeholder-color);
-  text-align: center;
-  padding: 1rem;
-}
-
 .drop-zone {
-  border: 2px dashed var(--input-border);
-  border-radius: 12px;
-  padding: 40px;
-  text-align: center;
-  cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
-  background-color: var(--panel-content-bg);
-  color: var(--text-primary);
-  position: relative;
-  min-height: 150px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-
-  &:hover {
-    border-color: var(--button-bg);
-    background-color: var(--input-bg);
-  }
-
-  &.loading {
-    cursor: default;
-  }
-
-  p {
-    margin: 0;
-    font-size: 1.1em;
-    color: var(--placeholder-color);
-  }
-}
-
-.scan-content {
-  background: var(--code-bg);
-  padding: 1rem;
-  border-radius: 6px;
-  overflow-x: auto;
-  margin: 0;
-  font-family: "Monaco", "Menlo", "Courier New", Courier, monospace;
-  font-size: 0.9rem;
-  line-height: 1.5;
-  color: var(--code-color);
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
-.link-check {
-  margin-top: 1rem;
-}
-
-.open-link-btn {
   width: 100%;
-}
-
-.error-message {
-  color: var(--error-color);
-  background-color: var(--error-bg);
-  padding: 0.75rem 1rem;
+  min-height: 160px;
+  padding: 24px;
+  border: 1px dashed var(--border-strong);
   border-radius: 8px;
-  text-align: center;
-  font-size: 0.9rem;
-  margin-top: 1rem;
+  color: var(--text);
+  background: var(--surface-alt);
+  overflow-wrap: anywhere;
 }
-
-.loader {
-  border: 4px solid var(--input-border);
-  border-top: 4px solid var(--button-bg);
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  animation: spin 1s linear infinite;
-  margin: 0 auto;
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
+.drop-zone:hover {
+  border-color: var(--accent);
 }
 </style>

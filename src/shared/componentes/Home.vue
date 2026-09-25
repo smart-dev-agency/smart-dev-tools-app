@@ -1,345 +1,278 @@
 <template>
-  <ComponentViewer title="Smart Dev Tools OSS">
-    <BaseCard>
-      <section class="col-12 p-4">
-        <div class="welcome-section">
-          <div class="welcome-header">
-            <h2>🛠️ Welcome to Smart Dev Tools OSS</h2>
-            <p class="welcome-subtitle">
-              A comprehensive suite of development tools built with <strong>Tauri</strong>, <strong>Vue 3</strong>, and <strong>TypeScript</strong>
-            </p>
-          </div>
-
-          <div class="intro-description">
-            <p>
-              Smart Dev Tools OSS is a native desktop application that provides developers with essential utilities for daily development tasks. All tools
-              run locally on your device, ensuring privacy and performance.
-            </p>
-            <p>Explore the sidebar to discover various categories of tools designed to streamline your development workflow.</p>
-          </div>
-        </div>
-
-        <BasePanel title="🚀 How to Use the Application" class="mt-4">
-          <div class="usage-instructions">
-            <div class="instruction-step">
-              <div class="step-number">1</div>
-              <div class="step-content">
-                <h4>Navigate through categories</h4>
-                <p>Use the left sidebar to explore different categories of available tools.</p>
-              </div>
-            </div>
-
-            <div class="instruction-step">
-              <div class="step-number">2</div>
-              <div class="step-content">
-                <h4>Search for a specific tool</h4>
-                <p>Use the search bar at the top of the sidebar to quickly find the tool you need.</p>
-              </div>
-            </div>
-
-            <div class="instruction-step">
-              <div class="step-number">3</div>
-              <div class="step-content">
-                <h4>Expand/collapse categories</h4>
-                <p>Click the ▼/▲ button to expand or collapse all categories at once, or click on each category individually.</p>
-              </div>
-            </div>
-
-            <div class="instruction-step">
-              <div class="step-number">4</div>
-              <div class="step-content">
-                <h4>Select and use a tool</h4>
-                <p>Click on any tool to open it in the main panel. Each tool includes its own intuitive and user-friendly interface.</p>
-              </div>
-            </div>
-
-            <div class="instruction-step">
-              <div class="step-number">5</div>
-              <div class="step-content">
-                <h4>Stay updated</h4>
-                <p>Use the 🔄 button in the sidebar to check for application updates and get new features.</p>
-              </div>
-            </div>
-          </div>
-        </BasePanel>
-
-        <BasePanel title="💡 Useful Tips" class="mt-4">
-          <div class="tips-grid">
-            <div class="tip-card">
-              <div class="tip-icon">⚡</div>
-              <div class="tip-content">
-                <h4>Native Performance</h4>
-                <p>All tools are natively compiled for your platform, ensuring maximum performance and compatibility.</p>
-              </div>
-            </div>
-
-            <div class="tip-card">
-              <div class="tip-icon">🔒</div>
-              <div class="tip-content">
-                <h4>Privacy Guaranteed</h4>
-                <p>All data is processed locally on your device. Nothing is sent to external servers.</p>
-              </div>
-            </div>
-
-            <div class="tip-card">
-              <div class="tip-icon">🌙</div>
-              <div class="tip-content">
-                <h4>Automatic Dark Mode</h4>
-                <p>The application automatically adapts to your operating system's theme configuration.</p>
-              </div>
-            </div>
-
-            <div class="tip-card">
-              <div class="tip-icon">📱</div>
-              <div class="tip-content">
-                <h4>Responsive Design</h4>
-                <p>The interface adapts perfectly to different window sizes for an optimal experience.</p>
-              </div>
-            </div>
-          </div>
-        </BasePanel>
-
-        <div class="footer-section mt-4">
-          <p class="footer-text"><strong>Smart Dev Tools OSS</strong> - Developed with ❤️ using modern technologies for modern developers.</p>
-          <p class="footer-version">Native compilation • Total privacy • Open source</p>
-        </div>
-      </section>
-    </BaseCard>
-  </ComponentViewer>
+  <section class="home-workspace">
+    <header class="home-heading">
+      <p class="eyebrow">SMART DEV TOOLS</p>
+      <h1>A little less friction.<br /><span>A lot more flow.</span></h1>
+      <p class="muted">
+        Your everyday developer tools, together in one quiet workspace.
+      </p>
+      <button class="home-search" @click="$emit('search')">
+        <Icon name="search" /><span>What are you working on?</span
+        ><Icon name="arrow" />
+      </button>
+    </header>
+    <section v-if="recent.length" class="recent-section">
+      <h2 class="section-title">Pick up where you left off</h2>
+      <div class="recent-tools">
+        <button v-for="id in recent" :key="id" @click="$emit('select', id)">
+          <span class="tool-symbol">{{
+            tools.find((tool) => tool.id === id)?.symbol
+          }}</span
+          >{{ tools.find((tool) => tool.id === id)?.name }}<Icon name="arrow" />
+        </button>
+      </div>
+    </section>
+    <div class="catalog-heading">
+      <h2>Explore your toolkit</h2>
+      <span>{{ tools.length }} focused tools</span>
+    </div>
+    <section v-for="group in groups" :key="group" class="catalog-group">
+      <h3 class="eyebrow">{{ group }}</h3>
+      <div class="tool-grid">
+        <article
+          v-for="tool in tools.filter((item) => item.group === group)"
+          :key="tool.id"
+          class="tool-card"
+        >
+          <button class="open-tool" @click="$emit('select', tool.id)">
+            <span class="card-symbol">{{ tool.symbol }}</span
+            ><strong>{{ tool.name }}</strong
+            ><span class="card-description">{{ tool.description }}</span
+            ><span class="tool-open"
+              >Open tool <Icon name="arrow"
+            /></span></button
+          ><button
+            class="pin-tool"
+            :class="{ pinned: favorites.includes(tool.id) }"
+            :aria-label="`${favorites.includes(tool.id) ? 'Unpin' : 'Pin'} ${tool.name}`"
+            :aria-pressed="favorites.includes(tool.id)"
+            @click="$emit('favorite', tool.id)"
+          >
+            <Icon name="star" />
+          </button>
+        </article>
+      </div>
+    </section>
+    <div class="home-note">
+      <Icon name="shield" />
+      <p>
+        Content stays in this session. Only your preferences, favorite tools and
+        recent tool names are saved.<br />TLS checks and update checks are the
+        only built-in network operations.
+      </p>
+    </div>
+  </section>
 </template>
-
 <script setup lang="ts">
-import BaseCard from "./BaseCard.vue";
-import BasePanel from "./BasePanel.vue";
-import ComponentViewer from "./ComponentViewer.vue";
+import { tools, type ToolId } from "../lib/tools";
+import Icon from "./Icon.vue";
+defineProps<{ favorites: ToolId[]; recent: ToolId[] }>();
+defineEmits<{ select: [id: ToolId]; favorite: [id: ToolId]; search: [] }>();
+const groups = [...new Set(tools.map((tool) => tool.group))];
 </script>
-
-<style scoped lang="scss">
-.welcome-section {
-  text-align: center;
-  margin-bottom: 2rem;
-}
-
-.welcome-header {
-  margin-bottom: 2rem;
-
-  h2 {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--text-primary, #111827);
-    margin-bottom: 1rem;
-  }
-
-  .welcome-subtitle {
-    font-size: 1.1rem;
-    color: var(--text-secondary, #6b7280);
-    line-height: 1.6;
-    max-width: 600px;
-    margin: 0 auto;
-  }
-}
-
-.intro-description {
-  max-width: 800px;
+<style scoped>
+.home-workspace {
+  padding: 40px 36px 24px;
+  max-width: 1400px;
   margin: 0 auto;
-  text-align: left;
-
-  p {
-    font-size: 1rem;
-    line-height: 1.6;
-    color: var(--text-secondary, #6b7280);
-    margin-bottom: 1rem;
-
-    &:last-child {
-      margin-bottom: 0;
-    }
-  }
 }
-
-.usage-instructions {
+.home-heading {
+  max-width: 680px;
+  margin-bottom: 34px;
+}
+.home-heading h1 {
+  font-size: clamp(26px, 3.3cqw, 39px);
+  line-height: 1.17;
+  font-weight: 650;
+  letter-spacing: -0.045em;
+  margin: 14px 0 15px;
+}
+.home-heading h1 span {
+  color: var(--muted);
+  font-weight: 450;
+}
+.home-heading > p.muted {
+  font-size: 13px;
+}
+.home-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--muted);
+  margin-top: 24px;
+  padding: 14px 16px;
+  text-align: left;
+}
+.home-search span {
+  flex: 1;
+}
+.home-search:hover {
+  border-color: var(--accent);
+}
+.section-title {
+  font-size: 12px;
+  font-weight: 550;
+  margin: 0 0 12px;
+}
+.recent-section {
+  margin-bottom: 32px;
+}
+.recent-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.recent-tools button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px 5px 4px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 6px;
+  font-size: 11px;
+}
+.recent-tools svg {
+  width: 13px;
+  color: var(--muted);
+  margin-left: 4px;
+}
+.catalog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  gap: 10px;
+}
+.catalog-heading h2 {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.catalog-heading > span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.catalog-group {
+  margin-bottom: 26px;
+}
+.catalog-group > h3 {
+  font-size: 10px;
+  margin-bottom: 12px;
+}
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.tool-card {
+  position: relative;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 9px;
+}
+.tool-card:hover {
+  border-color: var(--border-strong);
+}
+.open-tool {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-}
-
-.instruction-step {
-  display: flex;
-  gap: 1rem;
   align-items: flex-start;
-
-  .step-number {
-    flex-shrink: 0;
-    width: 32px;
-    height: 32px;
-    background: var(--primary-color, #3b82f6);
-    color: white;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 600;
-    font-size: 0.9rem;
-  }
-
-  .step-content {
-    flex: 1;
-
-    h4 {
-      margin: 0 0 0.5rem 0;
-      font-size: 1.1rem;
-      font-weight: 600;
-      color: var(--text-primary, #111827);
-    }
-
-    p {
-      margin: 0;
-      font-size: 0.95rem;
-      line-height: 1.5;
-      color: var(--text-secondary, #6b7280);
-    }
-  }
+  width: 100%;
+  height: 100%;
+  background: none;
+  border: none;
+  color: var(--text);
+  text-align: left;
+  padding: 18px;
 }
-
-.tips-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.5rem;
+.card-symbol {
+  font: 16px var(--mono);
+  color: var(--accent);
+  margin-bottom: 16px;
 }
-
-.tip-card {
+.open-tool strong {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.card-description {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.55;
+  flex: 1;
+}
+.tool-open {
   display: flex;
-  gap: 1rem;
-  padding: 1rem;
-  background: var(--hover-bg, #f8f9fa);
-  border-radius: 8px;
-  border: 1px solid var(--border-color, #e5e5e5);
-
-  .tip-icon {
-    flex-shrink: 0;
-    font-size: 1.5rem;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 18px;
+}
+.tool-open svg {
+  width: 12px;
+}
+.pin-tool {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+}
+.pin-tool:hover {
+  background: var(--surface-alt);
+}
+.pin-tool svg {
+  width: 14px;
+}
+.pin-tool.pinned {
+  color: var(--accent);
+}
+.pin-tool.pinned svg {
+  fill: var(--accent-soft);
+}
+.home-note {
+  display: flex;
+  align-items: start;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+  margin-top: 30px;
+  color: var(--muted);
+}
+.home-note p {
+  font-size: 11px;
+  line-height: 1.7;
+  margin: 0;
+}
+@container workspace (max-width: 780px) {
+  .tool-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .tip-content {
-    flex: 1;
-
-    h4 {
-      margin: 0 0 0.5rem 0;
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--text-primary, #111827);
-    }
-
-    p {
-      margin: 0;
-      font-size: 0.9rem;
-      line-height: 1.4;
-      color: var(--text-secondary, #6b7280);
-    }
+  .home-workspace {
+    padding: 30px 20px;
   }
 }
-
-.footer-section {
-  text-align: center;
-  padding: 2rem 0;
-  border-top: 1px solid var(--border-color, #e5e5e5);
-
-  .footer-text {
-    font-size: 1rem;
-    color: var(--text-primary, #111827);
-    margin-bottom: 0.5rem;
-  }
-
-  .footer-version {
-    font-size: 0.9rem;
-    color: var(--text-secondary, #6b7280);
-    margin: 0;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  .welcome-header {
-    h2 {
-      color: var(--text-primary, #f9fafb);
-    }
-
-    .welcome-subtitle {
-      color: var(--text-secondary, #9ca3af);
-    }
-  }
-
-  .intro-description {
-    p {
-      color: var(--text-secondary, #9ca3af);
-    }
-  }
-
-  .instruction-step {
-    .step-number {
-      background: var(--primary-color, #60a5fa);
-    }
-
-    .step-content {
-      h4 {
-        color: var(--text-primary, #f9fafb);
-      }
-
-      p {
-        color: var(--text-secondary, #9ca3af);
-      }
-    }
-  }
-
-  .tip-card {
-    background: var(--hover-bg, #374151);
-    border-color: var(--border-color, #4b5563);
-
-    .tip-content {
-      h4 {
-        color: var(--text-primary, #f9fafb);
-      }
-
-      p {
-        color: var(--text-secondary, #9ca3af);
-      }
-    }
-  }
-
-  .footer-section {
-    border-top-color: var(--border-color, #374151);
-
-    .footer-text {
-      color: var(--text-primary, #f9fafb);
-    }
-
-    .footer-version {
-      color: var(--text-secondary, #9ca3af);
-    }
-  }
-}
-
-@media (max-width: 768px) {
-  .welcome-header h2 {
-    font-size: 1.5rem;
-  }
-
-  .intro-description {
-    text-align: center;
-  }
-
-  .tips-grid {
+@container workspace (max-width: 440px) {
+  .tool-grid {
     grid-template-columns: 1fr;
   }
-
-  .instruction-step {
+  .catalog-heading {
+    align-items: start;
     flex-direction: column;
-    text-align: center;
-    gap: 0.5rem;
-  }
-
-  .tip-card {
-    flex-direction: column;
-    text-align: center;
-    gap: 0.5rem;
   }
 }
 </style>

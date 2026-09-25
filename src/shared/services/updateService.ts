@@ -39,19 +39,37 @@ export class UpdateService {
 
   async getLatestRelease(): Promise<GitHubRelease> {
     if (!this.isConfigured()) {
-      throw new Error("Update service not configured. Please set REPO_OWNER and REPO_NAME in updateService.ts");
+      throw new Error(
+        "Update service not configured. Please set REPO_OWNER and REPO_NAME in updateService.ts",
+      );
     }
 
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
     try {
-      const response = await fetch(`${this.GITHUB_API_URL}/${this.REPO_OWNER}/${this.REPO_NAME}/releases/latest`);
-
-      if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
-      }
-
-      return await response.json();
+      const response = await fetch(
+        `${this.GITHUB_API_URL}/${this.REPO_OWNER}/${this.REPO_NAME}/releases/latest`,
+        { signal: controller.signal },
+      );
+      if (!response.ok)
+        throw new Error(`Update check failed (HTTP ${response.status}).`);
+      const release = await response.json();
+      if (
+        !release ||
+        typeof release.tag_name !== "string" ||
+        typeof release.html_url !== "string"
+      )
+        throw new Error("Invalid release response.");
+      return {
+        ...release,
+        body: typeof release.body === "string" ? release.body : "",
+      };
     } catch (error) {
-      throw new Error("No se pudo consultar la última versión disponible");
+      if (controller.signal.aborted)
+        throw new Error("Update check timed out after 10 seconds.");
+      throw error;
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -59,7 +77,11 @@ export class UpdateService {
     const currentParts = current.replace("v", "").split(".").map(Number);
     const latestParts = latest.replace("v", "").split(".").map(Number);
 
-    for (let i = 0; i < Math.max(currentParts.length, latestParts.length); i++) {
+    for (
+      let i = 0;
+      i < Math.max(currentParts.length, latestParts.length);
+      i++
+    ) {
       const currentPart = currentParts[i] || 0;
       const latestPart = latestParts[i] || 0;
 
@@ -74,15 +96,16 @@ export class UpdateService {
   }
 
   async checkForUpdates(): Promise<UpdateInfo> {
-    const hasConnection = await this.hasInternetConnection();
-    if (!hasConnection) {
-      throw new Error("No hay conexión a internet disponible");
-    }
-
     try {
-      const [currentVersion, latestRelease] = await Promise.all([this.getCurrentVersion(), this.getLatestRelease()]);
+      const [currentVersion, latestRelease] = await Promise.all([
+        this.getCurrentVersion(),
+        this.getLatestRelease(),
+      ]);
 
-      const hasUpdate = this.compareVersions(currentVersion, latestRelease.tag_name);
+      const hasUpdate = this.compareVersions(
+        currentVersion,
+        latestRelease.tag_name,
+      );
 
       return {
         hasUpdate,
@@ -143,19 +166,6 @@ export class UpdateService {
 
   clearIgnoredVersion(): void {
     localStorage.removeItem("ignoredVersion");
-  }
-
-  private async hasInternetConnection(): Promise<boolean> {
-    try {
-      await fetch("https://api.github.com/", {
-        method: "HEAD",
-        mode: "no-cors",
-        cache: "no-cache",
-      });
-      return true;
-    } catch (error) {
-      return navigator.onLine;
-    }
   }
 }
 

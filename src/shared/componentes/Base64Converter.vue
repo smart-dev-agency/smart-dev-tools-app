@@ -1,253 +1,136 @@
 <template>
-  <ComponentViewer title="Base64 Converter">
-    <BaseCard>
-      <section class="col-5 h-100 p-3">
-        <div class="d-flex flex-column h-100">
-          <div class="input-group mb-3">
-            <label>Input Format:</label>
-            <select v-model="inputFormat" class="form-select">
-              <option value="text">Text</option>
+  <ComponentViewer title="Base64 & Hex"
+    ><div class="workbench">
+      <div class="stack">
+        <BasePanel title="Input"
+          ><label class="field"
+            >Input encoding<select v-model="inputFormat">
+              <option value="text">Text · UTF-8</option>
               <option value="hex">Hexadecimal</option>
               <option value="base64">Base64</option>
-            </select>
-          </div>
-
-          <BaseInput
-            v-model="input"
-            :placeholder="inputPlaceholder"
-            multiline
-            :rows="8"
-            class="flex-grow-1 mb-3"
-          />
-
-          <div class="input-group mb-3">
-            <label>Convert To:</label>
-            <select v-model="outputFormat" class="form-select">
-              <option value="text">Text</option>
-              <option value="hex">Hexadecimal</option>
-              <option value="base64">Base64</option>
-            </select>
-          </div>
-
-          <div v-if="outputFormat === 'hex'" class="hex-options mb-3">
-            <div class="input-group">
-              <label>Hexadecimal Format:</label>
-              <select v-model="hexCase" class="form-select">
-                <option value="lower">Lowercase</option>
-                <option value="upper">Uppercase</option>
-              </select>
-            </div>
-            <div class="input-group mt-2">
-              <label>Separator:</label>
-              <select v-model="hexSeparator" class="form-select">
-                <option value="">No Separator</option>
+              <option value="base64url">Base64URL</option>
+            </select></label
+          ><label class="field spaced"
+            >Content<BaseInput
+              v-model="input"
+              multiline
+              :rows="10"
+              placeholder="Enter the value to convert…" /></label></BasePanel
+        ><BasePanel title="Convert to"
+          ><div class="controls">
+            <label class="field"
+              >Output encoding<select v-model="outputFormat">
+                <option value="text">Text · UTF-8</option>
+                <option value="hex">Hexadecimal</option>
+                <option value="base64">Base64</option>
+                <option value="base64url">Base64URL</option>
+              </select></label
+            ><label v-if="outputFormat === 'hex'" class="field"
+              >Letter case<select v-model="uppercase">
+                <option :value="false">Lowercase</option>
+                <option :value="true">Uppercase</option>
+              </select></label
+            ><label v-if="outputFormat === 'hex'" class="field"
+              >Byte separator<select v-model="separator">
+                <option value="">None</option>
                 <option value=" ">Space</option>
-                <option value=":">Colon (:)</option>
-                <option value="-">Dash (-)</option>
-              </select>
-            </div>
-          </div>
-
-          <BaseButton @click="convert" class="mb-3">Convert</BaseButton>
-          <div v-if="error" class="error mb-3">{{ error }}</div>
+                <option value=":">Colon</option>
+                <option value="-">Dash</option>
+              </select></label
+            >
+          </div></BasePanel
+        >
+        <div class="controls">
+          <BaseButton :disabled="busy" @click="convert">{{
+            busy ? "Converting…" : "Convert"
+          }}</BaseButton
+          ><BaseButton variant="secondary" @click="clear">Clear</BaseButton>
         </div>
-      </section>
-
-      <section class="col-7 h-100 p-3">
-        <BasePanel title="Result" :content="result">
-          <pre v-if="result" class="result-text">{{ result }}</pre>
-          <div v-else class="placeholder-text">
-            The conversion result will be shown here
-          </div>
-        </BasePanel>
-      </section>
-    </BaseCard>
-  </ComponentViewer>
+        <p v-if="error" class="error" role="alert">{{ error }}</p>
+        <p class="hint">
+          Strict byte validation. Invalid hexadecimal, Base64 and UTF-8 are
+          reported, never silently repaired.
+        </p>
+      </div>
+      <BasePanel title="Result" :content="result?.text"
+        ><template v-if="result">
+          <pre>{{ result.text.slice(0, 100000) }}</pre>
+          <p class="hint" v-if="result.text.length > 100000">
+            Preview shows the first 100,000 characters. Copy and export include
+            the full result.
+          </p>
+          <div class="action-row">
+            <span class="tag">{{ result.bytes.toLocaleString() }} bytes</span
+            ><BaseButton variant="secondary" @click="swap"
+              >Use as input</BaseButton
+            ><BaseButton variant="secondary" @click="download"
+              >Export</BaseButton
+            >
+          </div></template
+        >
+        <div v-else class="empty-result">
+          <span class="empty-symbol">64</span>
+          <h2>A different representation. Same bytes.</h2>
+          <p>Convert text, hexadecimal, Base64 and Base64URL locally.</p>
+        </div></BasePanel
+      >
+    </div></ComponentViewer
+  >
 </template>
-
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import BaseButton from './BaseButton.vue';
-import BaseCard from './BaseCard.vue';
-import BaseInput from './BaseInput.vue';
-import BasePanel from './BasePanel.vue';
-import ComponentViewer from './ComponentViewer.vue';
-
-const input = ref('');
-const inputFormat = ref('base64');
-const outputFormat = ref('text');
-const result = ref('');
-const error = ref('');
-const hexCase = ref('lower');
-const hexSeparator = ref('');
-
-const inputPlaceholder = computed(() => {
-  switch (inputFormat.value) {
-    case 'text':
-      return 'Enter the text to convert...';
-    case 'hex':
-      return 'Enter hexadecimal string (with or without separators like :, -, or spaces)...';
-    case 'base64':
-      return 'Enter the Base64 string to convert...';
-    default:
-      return '';
-  }
+import { ref, watch } from "vue";
+import type { Encoding } from "../lib/binary";
+import { useWorker } from "../lib/useWorker";
+import { saveText } from "../lib/output";
+import BaseButton from "./BaseButton.vue";
+import BasePanel from "./BasePanel.vue";
+import BaseInput from "./BaseInput.vue";
+import ComponentViewer from "./ComponentViewer.vue";
+const input = ref(""),
+  inputFormat = ref<Encoding>("text"),
+  outputFormat = ref<Encoding>("base64"),
+  uppercase = ref(false),
+  separator = ref("");
+const { result, busy, error, run, reset } = useWorker<{
+  text: string;
+  bytes: number;
+}>();
+watch([input, inputFormat, outputFormat, uppercase, separator], reset, {
+  flush: "sync",
 });
-
 function convert() {
-  error.value = '';
-  result.value = '';
-
-  if (!input.value) {
-    error.value = 'Please enter a value to convert';
-    return;
-  }
-
+  run({
+    kind: "convert",
+    text: input.value,
+    input: inputFormat.value,
+    output: outputFormat.value,
+    uppercase: uppercase.value,
+    separator: separator.value,
+  });
+}
+function clear() {
+  input.value = "";
+  reset();
+}
+function swap() {
+  if (!result.value) return;
+  const text = result.value.text,
+    from = inputFormat.value;
+  input.value = text;
+  inputFormat.value = outputFormat.value;
+  outputFormat.value = from;
+}
+async function download() {
+  if (!result.value) return;
   try {
-    let bytes: Uint8Array;
-    
-    switch (inputFormat.value) {
-      case 'text':
-        bytes = new TextEncoder().encode(input.value);
-        break;
-      case 'hex':
-        bytes = hexToBytes(input.value);
-        break;
-      case 'base64':
-        bytes = base64ToBytes(input.value);
-        break;
-      default:
-        throw new Error('Invalid input format');
-    }
-
-    switch (outputFormat.value) {
-      case 'text':
-        result.value = new TextDecoder().decode(bytes);
-        break;
-      case 'hex':
-        result.value = bytesToHex(bytes);
-        break;
-      case 'base64':
-        result.value = bytesToBase64(bytes);
-        break;
-      default:
-        throw new Error('Invalid output format');
-    }
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Conversion error';
-  }
-}
-
-function hexToBytes(hex: string): Uint8Array {
-  // Remove common separators: spaces, colons, dashes, and any whitespace
-  hex = hex.replace(/[\s:.-]/g, '');
-  
-  if (hex.length % 2 !== 0) {
-    throw new Error('Hexadecimal string must have an even length');
-  }
-  
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < hex.length; i += 2) {
-    const byte = parseInt(hex.substr(i, 2), 16);
-    if (isNaN(byte)) {
-      throw new Error('Invalid hexadecimal string');
-    }
-    bytes[i / 2] = byte;
-  }
-  return bytes;
-}
-
-function bytesToHex(bytes: Uint8Array): string {
-  const hexString = Array.from(bytes)
-    .map(byte => byte.toString(16).padStart(2, '0'))
-    .join(hexSeparator.value);
-    
-  return hexCase.value === 'upper' ? hexString.toUpperCase() : hexString;
-}
-
-function base64ToBytes(base64: string): Uint8Array {
-  try {
-    const binStr = atob(base64);
-    const bytes = new Uint8Array(binStr.length);
-    for (let i = 0; i < binStr.length; i++) {
-      bytes[i] = binStr.charCodeAt(i);
-    }
-    return bytes;
+    await saveText(result.value.text, "converted.txt");
   } catch {
-    throw new Error('Invalid Base64 string');
+    error.value = "Could not save the result.";
   }
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  const binStr = String.fromCharCode(...bytes);
-  return btoa(binStr);
 }
 </script>
-
-<style scoped lang="scss">
-.input-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  
-  label {
-    font-weight: 500;
-  }
-}
-
-.form-select {
-  padding: 0.6em 1.2em;
-  border-radius: 8px;
-  border: 1px solid var(--input-border);
-  background-color: var(--input-bg);
-  color: var(--input-color);
-  font-size: 1em;
-  transition: all 0.2s ease;
-  
-  &:focus {
-    border-color: var(--button-bg);
-    outline: none;
-    box-shadow: var(--input-focus-shadow);
-  }
-}
-
-.result-text {
-  background: var(--code-bg);
-  padding: 1rem;
-  border-radius: 6px;
-  overflow-x: auto;
-  margin: 0;
-  font-family: 'Monaco', 'Menlo', 'Courier New', Courier, monospace;
-  font-size: 0.9rem;
-  line-height: 1.5;
-  color: var(--code-color);
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
-.error {
-  color: var(--error-color);
-  font-size: 0.9rem;
-  padding: 0.5rem;
-  border-radius: 6px;
-  background: var(--error-bg);
-}
-
-.placeholder-text {
-  color: var(--placeholder-color);
-  font-size: 0.9rem;
-  text-align: center;
-  padding: 1rem;
-}
-
-.hex-options {
-  border: 1px solid var(--input-border);
-  border-radius: 8px;
-  padding: 1rem;
-  background: var(--code-bg);
-  
-  .input-group + .input-group {
-    margin-top: 0.5rem;
-  }
+<style scoped>
+.spaced {
+  margin-top: 16px;
 }
 </style>

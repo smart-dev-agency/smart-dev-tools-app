@@ -106,21 +106,27 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'yarn'
+          cache: 'npm'
 
       - name: Install frontend dependencies
-        run: yarn install
+        run: npm ci
+
+      - name: Check tool logic
+        run: npm run check
+
+      - name: Test native commands
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib --locked
 
       - name: Build the application
         shell: bash
         run: |
-          echo "🚀 Building with yarn tauri build (native compilation)"
+          echo "🚀 Building with npm run tauri build (native compilation)"
           echo "Platform: ${{ matrix.platform }} → ${{ matrix.arch }}"
           echo "Target: ${{ matrix.target }}"
           echo "System arch: $(uname -m || echo 'unknown')"
           
           # Use native compilation - no cross-compilation needed
-          yarn tauri build
+          npm run tauri build
 
       - name: Post-build verification
         shell: bash

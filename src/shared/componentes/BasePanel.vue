@@ -1,94 +1,44 @@
 <template>
-  <div class="base-panel">
-    <div class="panel-header">
-      <h2 class="panel-title">{{ title }}</h2>
-      <button v-if="content" class="copy-button" @click="copyContent" :title="copyStatus">
-        <span v-if="!copied">📋</span>
-        <span v-else>✓</span>
+  <section class="base-panel" :aria-labelledby="id">
+    <header class="panel-header">
+      <h2 :id="id" class="panel-title">{{ title }}</h2>
+      <slot name="actions" /><button
+        v-if="content !== undefined"
+        class="copy-button quiet-button"
+        :aria-label="`Copy ${title}`"
+        @click="copy"
+      >
+        <Icon name="copy" />{{ copied ? "Copied" : "Copy" }}
       </button>
-    </div>
+    </header>
     <div class="panel-content">
       <slot />
+      <p v-if="copyError" class="error" role="alert">{{ copyError }}</p>
+      <span class="sr-only" role="status">{{
+        copied ? `${title} copied` : ""
+      }}</span>
     </div>
-  </div>
+  </section>
 </template>
-
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-
-const props = defineProps<{
-  title: string;
-  content?: string;
-}>();
-
-const copied = ref(false);
-const copyStatus = computed(() => copied.value ? 'Copied!' : 'Copy to clipboard');
-
-async function copyContent() {
-  if (!props.content) return;
-  
+import { onBeforeUnmount, ref, useId } from "vue";
+import { copyText } from "../lib/output";
+import Icon from "./Icon.vue";
+const props = defineProps<{ title: string; content?: string }>();
+const id = useId(),
+  copied = ref(false),
+  copyError = ref("");
+let timer: ReturnType<typeof setTimeout>;
+async function copy() {
+  copyError.value = "";
   try {
-    await navigator.clipboard.writeText(props.content);
+    await copyText(props.content ?? "");
     copied.value = true;
-    setTimeout(() => {
-      copied.value = false;
-    }, 2000);
-  } catch (err) {
-    console.error('Copy error:', err);
+    clearTimeout(timer);
+    timer = setTimeout(() => (copied.value = false), 2000);
+  } catch {
+    copyError.value = "Could not copy. Select the result and copy it manually.";
   }
 }
+onBeforeUnmount(() => clearTimeout(timer));
 </script>
-
-<style scoped lang="scss">
-.base-panel {
-  background: var(--panel-bg);
-  color: var(--text-primary);
-  border-radius: 12px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  transition: all 0.3s ease;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-}
-
-.panel-header {
-  padding: 0.75rem 1rem;
-  background: var(--panel-header-bg);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  position: relative;
-}
-
-.panel-title {
-  margin: 0;
-  text-align: center;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.copy-button {
-  position: absolute;
-  right: 0.75rem;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 0.25rem;
-  font-size: 1.1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0.7;
-  transition: opacity 0.2s ease;
-
-  &:hover {
-    opacity: 1;
-  }
-}
-
-.panel-content {
-  padding: 1rem;
-  background: var(--panel-content-bg);
-}
-</style>

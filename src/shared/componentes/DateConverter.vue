@@ -3,12 +3,21 @@
     <BaseCard>
       <section class="col-5 h-100 p-3">
         <div class="d-flex flex-column h-100">
-          <BaseInput v-model="inputDate" placeholder="Enter a date, epoch, or timestamp" class="mb-3" />
-          <BaseButton @click="convertDate" class="mb-3">Convert</BaseButton>
+          <BaseInput
+            v-model="inputDate"
+            placeholder="Enter a date, epoch, or timestamp"
+            class="mb-3"
+          />
+          <div class="controls mb-3">
+            <BaseButton @click="convertDate">Convert</BaseButton
+            ><BaseButton variant="secondary" @click="useNow"
+              >Use now</BaseButton
+            >
+          </div>
 
           <div class="input-group mb-3">
-            <label>Input Format:</label>
-            <select v-model="inputFormat" class="form-select">
+            <label for="date-format">Input format</label>
+            <select id="date-format" v-model="inputFormat" class="form-select">
               <option value="auto">Auto-detect</option>
               <option value="epoch">Epoch (seconds)</option>
               <option value="timestamp">Timestamp (milliseconds)</option>
@@ -17,12 +26,21 @@
             </select>
           </div>
 
-          <div v-if="error" class="error mb-3">{{ error }}</div>
+          <p class="hint mb-3">
+            Auto: numeric values below 100 billion are seconds; larger values
+            are milliseconds. Choose units for ambiguous values. Dates without
+            an offset use your local timezone.
+          </p>
+          <div v-if="error" role="alert" class="error mb-3">{{ error }}</div>
         </div>
       </section>
 
       <section class="col-7 h-100 p-3">
-        <BasePanel v-if="dateObj" title="Conversions" :content="conversionsText">
+        <BasePanel
+          v-if="dateObj"
+          title="Conversions"
+          :content="conversionsText"
+        >
           <div class="conversions">
             <div class="conversion-item">
               <strong>Local Date:</strong>
@@ -50,19 +68,23 @@
             </div>
           </div>
         </BasePanel>
-        <div v-else class="placeholder-text">Enter a date to see all conversions</div>
+        <div v-else class="placeholder-text">
+          Enter a date to see all conversions
+        </div>
       </section>
     </BaseCard>
   </ComponentViewer>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import BaseButton from "./BaseButton.vue";
 import BaseCard from "./BaseCard.vue";
 import BaseInput from "./BaseInput.vue";
 import BasePanel from "./BasePanel.vue";
 import ComponentViewer from "./ComponentViewer.vue";
+
+import { parseDate } from "../lib/textTools";
 
 const inputDate = ref("");
 const inputFormat = ref("auto");
@@ -72,7 +94,9 @@ const error = ref("");
 const localDate = computed(() => dateObj.value?.toLocaleString());
 const utcDate = computed(() => dateObj.value?.toUTCString());
 const isoDate = computed(() => dateObj.value?.toISOString());
-const epoch = computed(() => (dateObj.value ? Math.floor(dateObj.value.getTime() / 1000) : null));
+const epoch = computed(() =>
+  dateObj.value ? Math.floor(dateObj.value.getTime() / 1000) : null,
+);
 const timestamp = computed(() => dateObj.value?.getTime());
 const conversionsText = computed(() => {
   if (!dateObj.value) return "";
@@ -98,12 +122,26 @@ const relative = computed(() => {
     if (minutes > 0) return `In ${minutes} minutes`;
     return `In ${seconds} seconds`;
   } else {
-    if (days > 0) return `Ago ${days} days`;
-    if (hours > 0) return `Ago ${hours} hours`;
-    if (minutes > 0) return `Ago ${minutes} minutes`;
-    return `Ago ${seconds} seconds`;
+    if (days > 0) return `${days} days ago`;
+    if (hours > 0) return `${hours} hours ago`;
+    if (minutes > 0) return `${minutes} minutes ago`;
+    return `${seconds} seconds ago`;
   }
 });
+
+watch(
+  [inputDate, inputFormat],
+  () => {
+    dateObj.value = null;
+    error.value = "";
+  },
+  { flush: "sync" },
+);
+function useNow() {
+  inputFormat.value = "timestamp";
+  inputDate.value = String(Date.now());
+  convertDate();
+}
 
 function convertDate() {
   error.value = "";
@@ -115,41 +153,9 @@ function convertDate() {
   }
 
   try {
-    let date: Date | null = null;
-
-    switch (inputFormat.value) {
-      case "epoch":
-        date = new Date(parseInt(inputDate.value) * 1000);
-        break;
-      case "timestamp":
-        date = new Date(parseInt(inputDate.value));
-        break;
-      case "iso":
-        date = new Date(inputDate.value);
-        break;
-      case "human":
-        date = new Date(inputDate.value);
-        break;
-      case "auto":
-      default:
-        if (/^\d+$/.test(inputDate.value)) {
-          if (inputDate.value.length <= 10) {
-            date = new Date(parseInt(inputDate.value) * 1000);
-          } else {
-            date = new Date(parseInt(inputDate.value));
-          }
-        } else {
-          date = new Date(inputDate.value);
-        }
-    }
-
-    if (isNaN(date.getTime())) {
-      throw new Error("Invalid date");
-    }
-
-    dateObj.value = date;
+    dateObj.value = parseDate(inputDate.value, inputFormat.value);
   } catch (e) {
-    error.value = "Could not convert the date. Please check the format.";
+    error.value = e instanceof Error ? e.message : String(e);
   }
 }
 </script>
@@ -196,7 +202,7 @@ function convertDate() {
   border-radius: 6px;
 
   strong {
-    color: #0090ff;
+    color: var(--accent);
     font-size: 0.9rem;
     opacity: 0.9;
   }

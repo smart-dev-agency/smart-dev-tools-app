@@ -1,34 +1,18 @@
 <template>
-  <section class="component-viewer col col-12">
-    <h1 class="title mt-3 mx-3">{{ title }}</h1>
-    <div class="content">
-      <slot />
-    </div>
+  <section class="tool-view">
+    <header class="tool-heading">
+      <p class="eyebrow">{{ meta?.group || "Workspace" }}</p>
+      <h1>{{ title }}</h1>
+      <p class="muted">{{ description || meta?.description }}</p>
+    </header>
+    <div class="tool-content"><slot /></div>
   </section>
 </template>
-
 <script setup lang="ts">
-defineProps<{
-  title: string;
-}>();
+import { inject, type ComputedRef } from "vue";
+defineProps<{ title: string; description?: string }>();
+const meta =
+  inject<ComputedRef<{ group: string; description: string } | undefined>>(
+    "toolMeta",
+  );
 </script>
-
-<style scoped>
-.component-viewer {
-  background: var(--card-bg);
-  color: var(--card-color);
-  height: 100%;
-  overflow: hidden;
-}
-
-.title {
-  font-size: 1.75rem;
-  font-weight: 600;
-  margin-bottom: 1.5rem;
-  color: var(--card-color);
-}
-
-.content {
-  overflow: auto;
-}
-</style>
