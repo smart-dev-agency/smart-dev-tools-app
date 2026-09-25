@@ -1,6 +1,6 @@
 {
   "name": "smart-dev-tools",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "type": "module",
   "description": "A collection of useful tools for developers",
   "author": "Smart Dev Agency",
@@ -19,6 +19,7 @@
   },
   "scripts": {
     "check": "node scripts/check.mjs",
+    "bump": "node scripts/version.mjs",
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",

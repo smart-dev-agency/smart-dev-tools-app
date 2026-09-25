@@ -1,6 +1,17 @@
 # Changelog
 
-## [2.0.0] - 2025-09-24
+## [2.0.1] - 2026-09-24
+
+### Fixed
+
+- Synchronized the application version in tauri.conf.json and package-lock.json; both still declared 1.6.2, so the 2.0.0 installers were labelled 1.6.2.
+
+### Maintenance
+
+- CI now only runs checks and tests on pushes and pull requests to main. The application is compiled once, by the release workflow, when a version tag is pushed.
+- Removed the macOS Intel (x86_64) build from the release workflow.
+
+## [2.0.0] - 2026-09-24
 
 ### Added
 
