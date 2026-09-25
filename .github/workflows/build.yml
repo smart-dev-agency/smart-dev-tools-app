@@ -1,7 +1,6 @@
 name: 'Build and Test Smart Dev Tools'
 
 # This workflow builds native binaries for each platform using their respective runners:
-# - macOS Intel: Built on macos-13 (Intel hardware) 
 # - macOS Apple Silicon: Built on macos-14 (ARM64 hardware)
 # - Linux x86_64: Built on ubuntu-22.04 (x86_64 hardware)
 # - Windows x86_64: Built on windows-latest (x86_64 hardware)
@@ -27,12 +26,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macOS Intel (x86_64) - compiled natively on Intel runner
-          - platform: 'macos-13'
-            target: x86_64-apple-darwin
-            arch: 'Intel'
-            os: 'macOS'
-            runner_arch: 'x64'
           # macOS Apple Silicon (ARM64) - compiled natively on ARM runner
           - platform: 'macos-14'
             target: aarch64-apple-darwin
@@ -89,13 +82,8 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          if [[ "${{ matrix.platform }}" == "macos-14" ]]; then
-            echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> $GITHUB_ENV
-            echo "📱 Apple Silicon build - deployment target: 11.0"
-          else
-            echo "MACOSX_DEPLOYMENT_TARGET=10.13" >> $GITHUB_ENV
-            echo "💻 Intel Mac build - deployment target: 10.13"
-          fi
+          echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> $GITHUB_ENV
+          echo "📱 Apple Silicon build - deployment target: 11.0"
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
